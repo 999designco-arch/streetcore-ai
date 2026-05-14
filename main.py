@@ -24,6 +24,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
 MEMORY_FILE = "memory.json"
+PROJECTS_FILE = "projects.json"
+TASKS_FILE = "tasks.json"
 
 # ====================================
 # MASTER PROMPT
@@ -32,40 +34,25 @@ MEMORY_FILE = "memory.json"
 MASTER_PROMPT = """
 Você é StreetCore AI.
 
-Um agente executivo, criativo e operacional.
-
-Você atua como:
-- CEO;
-- estrategista;
-- branding expert;
-- diretor criativo;
-- especialista em marketing;
-- especialista em IA;
-- engenheiro de automação;
-- growth hacker;
-- operador pessoal.
+Um agente executivo, estratégico,
+criativo e operacional.
 
 Você ajuda o usuário:
 - criar negócios;
 - criar marcas;
-- criar conteúdo;
+- organizar projetos;
 - automatizar tarefas;
-- crescer nas redes sociais;
-- desenvolver produtos digitais;
-- criar sistemas inteligentes.
+- crescer;
+- monetizar;
+- executar ideias.
 
-Você sempre responde:
-- em português;
-- com clareza;
-- passo a passo;
-- como parceiro operacional.
-
-Use estética:
-- futurista;
-- premium;
-- street luxury;
-- cyberpunk minimalista;
-- cinematográfica.
+Você sempre:
+- responde em português;
+- explica passo a passo;
+- age como parceiro operacional;
+- pensa em escala;
+- pensa em branding;
+- pensa em produtividade.
 """
 
 # ====================================
@@ -90,6 +77,77 @@ def save_memory(memory):
             indent=2
         )
 
+# ====================================
+# PROJECTS
+# ====================================
+
+def load_projects():
+
+    if not os.path.exists(PROJECTS_FILE):
+        return []
+
+    with open(PROJECTS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+def save_projects(projects):
+
+    with open(PROJECTS_FILE, "w", encoding="utf-8") as file:
+        json.dump(
+            projects,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
+
+# ====================================
+# TASKS
+# ====================================
+
+def load_tasks():
+
+    if not os.path.exists(TASKS_FILE):
+        return []
+
+    with open(TASKS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+def save_tasks(tasks):
+
+    with open(TASKS_FILE, "w", encoding="utf-8") as file:
+        json.dump(
+            tasks,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
+
+# ====================================
+# IMAGE SYSTEM
+# ====================================
+
+def gerar_imagem_url(prompt):
+
+    premium_prompt = f"""
+ultra realistic cinematic image,
+street luxury futuristic aesthetic,
+cyberpunk executive style,
+premium lighting,
+8k,
+highly detailed.
+
+{prompt}
+"""
+
+    encoded = urllib.parse.quote(
+        premium_prompt
+    )
+
+    return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed=77"
+
+# ====================================
+# AUTO MEMORY
+# ====================================
+
 def auto_memory(user_message, memory):
 
     text = user_message.lower()
@@ -111,11 +169,6 @@ def auto_memory(user_message, memory):
                 "minha marca é"
             )[1].strip()
 
-        if "meu nicho é" in text:
-            memory["nicho"] = text.split(
-                "meu nicho é"
-            )[1].strip()
-
     except:
         pass
 
@@ -126,30 +179,6 @@ def auto_memory(user_message, memory):
     save_memory(memory)
 
 # ====================================
-# IMAGE SYSTEM
-# ====================================
-
-def gerar_imagem_url(prompt):
-
-    premium_prompt = f"""
-ultra realistic cinematic image,
-street luxury futuristic aesthetic,
-cyberpunk executive style,
-premium lighting,
-8k,
-luxury global brand style,
-highly detailed.
-
-{prompt}
-"""
-
-    encoded_prompt = urllib.parse.quote(
-        premium_prompt
-    )
-
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed=77"
-
-# ====================================
 # COMMANDS
 # ====================================
 
@@ -158,28 +187,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = """
 🔥 STREETCORE AI ONLINE
 
-AGENTE PREMIUM ATIVO
-
 CAPACIDADES:
-✅ IA avançada
+
+✅ IA
 ✅ Branding
 ✅ Estratégia
+✅ Projetos
+✅ Tarefas
+✅ Imagens
 ✅ Memória
-✅ Imagens IA
-✅ Conteúdo
-✅ Growth
-✅ Agência criativa
 
 COMANDOS:
 
 /status
 /memoria
+/projeto
+/projetos
+/tarefa
+/tarefas
 /imagem
 /logo
-/nome
-/slogan
-/post
-/video
 """
 
     await update.message.reply_text(text)
@@ -193,9 +220,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Sistema: ONLINE
 IA: Groq
-Imagem: Grátis
 Memória: Ativa
-Modo: Agência Premium
+Projetos: Ativos
+Modo: CEO EXECUTIVO
 """
 
     await update.message.reply_text(text)
@@ -219,6 +246,105 @@ async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+# ====================================
+# PROJECT COMMANDS
+# ====================================
+
+async def projeto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    nome = " ".join(context.args)
+
+    if not nome:
+        await update.message.reply_text(
+            "Use:\n/projeto nome do projeto"
+        )
+        return
+
+    projects = load_projects()
+
+    novo = {
+        "nome": nome,
+        "data": str(datetime.now())
+    }
+
+    projects.append(novo)
+
+    save_projects(projects)
+
+    await update.message.reply_text(
+        f"✅ Projeto criado:\n{nome}"
+    )
+
+# ====================================
+
+async def projetos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    projects = load_projects()
+
+    if not projects:
+        await update.message.reply_text(
+            "Nenhum projeto criado."
+        )
+        return
+
+    text = "📁 PROJETOS:\n\n"
+
+    for p in projects:
+        text += f"• {p['nome']}\n"
+
+    await update.message.reply_text(text)
+
+# ====================================
+# TASK COMMANDS
+# ====================================
+
+async def tarefa(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    nome = " ".join(context.args)
+
+    if not nome:
+        await update.message.reply_text(
+            "Use:\n/tarefa descrição"
+        )
+        return
+
+    tasks = load_tasks()
+
+    nova = {
+        "tarefa": nome,
+        "status": "pendente",
+        "data": str(datetime.now())
+    }
+
+    tasks.append(nova)
+
+    save_tasks(tasks)
+
+    await update.message.reply_text(
+        f"✅ Tarefa criada:\n{nome}"
+    )
+
+# ====================================
+
+async def tarefas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    tasks = load_tasks()
+
+    if not tasks:
+        await update.message.reply_text(
+            "Nenhuma tarefa criada."
+        )
+        return
+
+    text = "📝 TAREFAS:\n\n"
+
+    for t in tasks:
+        text += f"• {t['tarefa']} ({t['status']})\n"
+
+    await update.message.reply_text(text)
+
+# ====================================
+# IMAGE
 # ====================================
 
 async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -256,9 +382,7 @@ async def logo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logo_prompt = f"""
 minimal futuristic luxury logo,
 clean branding,
-streetwear premium identity,
-white background,
-high-end fashion logo.
+premium streetwear identity.
 
 {prompt}
 """
@@ -274,150 +398,6 @@ high-end fashion logo.
     await update.message.reply_photo(
         photo=image_url
     )
-
-# ====================================
-
-async def nome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    niche = " ".join(context.args)
-
-    prompt = f"""
-Crie 10 nomes premium,
-modernos e fortes para:
-{niche}
-
-Os nomes devem parecer:
-- marcas globais;
-- fashion brands;
-- startups bilionárias;
-- marcas futuristas.
-"""
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    reply = completion.choices[0].message.content
-
-    await update.message.reply_text(reply)
-
-# ====================================
-
-async def slogan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    niche = " ".join(context.args)
-
-    prompt = f"""
-Crie slogans premium,
-curtos, fortes e cinematográficos
-para:
-{niche}
-"""
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    reply = completion.choices[0].message.content
-
-    await update.message.reply_text(reply)
-
-# ====================================
-
-async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    niche = " ".join(context.args)
-
-    prompt = f"""
-Crie um post viral premium para Instagram.
-
-Tema:
-{niche}
-
-Estrutura:
-- headline forte;
-- legenda;
-- CTA;
-- estilo futurista;
-- branding premium.
-"""
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    reply = completion.choices[0].message.content
-
-    await update.message.reply_text(reply)
-
-# ====================================
-
-async def video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    niche = " ".join(context.args)
-
-    prompt = f"""
-Crie um prompt cinematográfico
-para gerar um vídeo IA viral.
-
-Tema:
-{niche}
-
-Estilo:
-- luxo futurista;
-- cyberpunk premium;
-- campanha global;
-- vertical TikTok/Reels;
-- cinematográfico.
-"""
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    reply = completion.choices[0].message.content
-
-    await update.message.reply_text(reply)
 
 # ====================================
 # CHAT
@@ -471,12 +451,14 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("status", status))
 app.add_handler(CommandHandler("memoria", memoria))
 
+app.add_handler(CommandHandler("projeto", projeto))
+app.add_handler(CommandHandler("projetos", projetos))
+
+app.add_handler(CommandHandler("tarefa", tarefa))
+app.add_handler(CommandHandler("tarefas", tarefas))
+
 app.add_handler(CommandHandler("imagem", imagem))
 app.add_handler(CommandHandler("logo", logo))
-app.add_handler(CommandHandler("nome", nome))
-app.add_handler(CommandHandler("slogan", slogan))
-app.add_handler(CommandHandler("post", post))
-app.add_handler(CommandHandler("video", video))
 
 app.add_handler(
     MessageHandler(
@@ -485,6 +467,6 @@ app.add_handler(
     )
 )
 
-print("🔥 STREETCORE AI PREMIUM ONLINE")
+print("🔥 STREETCORE AI OPERACIONAL ONLINE")
 
 app.run_polling()
