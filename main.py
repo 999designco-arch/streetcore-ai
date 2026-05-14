@@ -1,21 +1,11 @@
 import os
 import json
+import urllib.parse
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from groq import Groq
-
-# =========================================
-# CONFIG
-# =========================================
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -24,61 +14,17 @@ client = Groq(api_key=GROQ_API_KEY)
 
 MEMORY_FILE = "memory.json"
 
-# =========================================
-# MASTER PROMPT
-# =========================================
-
 MASTER_PROMPT = """
-Você é StreetCore AI.
-
-Um agente de inteligência artificial executivo,
-criativo, operacional e estratégico.
-
-Você atua como:
-- CEO;
-- estrategista;
-- diretor criativo premium;
-- especialista em IA;
-- engenheiro de automação;
-- programador;
-- growth hacker;
-- operador pessoal.
-
-Seu objetivo:
-transformar qualquer ideia do usuário
-em execução prática, inteligente,
-automatizada e escalável.
-
-REGRAS:
-- sempre responda em português;
-- explique passo a passo;
-- aja como parceiro operacional;
-- seja extremamente inteligente;
-- pense em branding, dinheiro,
-escala, automação e crescimento;
-- use linguagem clara;
-- dê soluções práticas;
-- mantenha contexto do usuário;
-- memorize informações importantes.
-
-ESTILO:
-- premium;
-- futurista;
-- executivo;
-- criativo;
-- cinematográfico;
-- street luxury;
-- cyberpunk minimalista.
+Você é StreetCore AI, um agente executivo, criativo e operacional.
+Responda sempre em português.
+Use apenas ferramentas gratuitas ou com plano grátis como padrão.
+Aja como CEO, estrategista, diretor criativo, programador, automação e growth hacker.
+Explique passo a passo, como se estivesse pegando na mão do usuário.
 """
-
-# =========================================
-# MEMORY SYSTEM
-# =========================================
 
 def load_memory():
     if not os.path.exists(MEMORY_FILE):
         return {}
-
     with open(MEMORY_FILE, "r", encoding="utf-8") as file:
         return json.load(file)
 
@@ -87,150 +33,104 @@ def save_memory(memory):
         json.dump(memory, file, ensure_ascii=False, indent=2)
 
 def auto_memory(user_message, memory):
-
     text = user_message.lower()
 
-    # nome
     if "meu nome é" in text:
-        try:
-            nome = text.split("meu nome é")[1].strip()
-            memory["nome"] = nome
-        except:
-            pass
+        memory["nome"] = text.split("meu nome é")[1].strip()
 
-    # objetivo
     if "quero criar" in text:
-        try:
-            objetivo = text.split("quero criar")[1].strip()
-            memory["objetivo"] = objetivo
-        except:
-            pass
+        memory["objetivo"] = text.split("quero criar")[1].strip()
 
-    # marca
-    if "minha marca" in text:
-        try:
-            marca = text.split("minha marca")[1].strip()
-            memory["marca"] = marca
-        except:
-            pass
-
-    # nicho
-    if "meu nicho é" in text:
-        try:
-            nicho = text.split("meu nicho é")[1].strip()
-            memory["nicho"] = nicho
-        except:
-            pass
+    if "minha marca é" in text:
+        memory["marca"] = text.split("minha marca é")[1].strip()
 
     memory["ultima_interacao"] = str(datetime.now())
-
     save_memory(memory)
 
-# =========================================
-# COMMANDS
-# =========================================
+def gerar_url_imagem(prompt):
+    prompt_premium = f"""
+    ultra realistic cinematic image, street luxury, futuristic premium design,
+    cyberpunk executive aesthetic, dramatic lighting, 8k, highly detailed,
+    global luxury brand campaign style. Theme: {prompt}
+    """
+
+    encoded_prompt = urllib.parse.quote(prompt_premium)
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed=777"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    welcome = """
+    await update.message.reply_text("""
 🔥 StreetCore AI ONLINE
 
-Seu agente executivo agora está ativo.
-
-Capacidades:
-✅ Estratégia
+Funções:
+✅ IA com Groq grátis
+✅ Memória
+✅ Geração de imagem grátis
+✅ Modo CEO
 ✅ Branding
-✅ IA
-✅ Automação
-✅ Negócios
-✅ Conteúdo
-✅ Growth
-✅ Programação
-✅ Memória Inteligente
+✅ Estratégia
 
 Comandos:
-
-/memoria
-/limparmemoria
 /status
-"""
+/memoria
+/imagem descrição
+/limparmemoria
+""")
 
-    await update.message.reply_text(welcome)
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("""
+🚀 STATUS
 
-# =========================================
+Sistema: ONLINE
+IA: Groq
+Imagem: Pollinations grátis
+Memória: ATIVA
+Modo: CEO EXECUTIVO
+""")
 
 async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     memory = load_memory()
 
     if not memory:
-        await update.message.reply_text(
-            "Ainda não existem memórias salvas."
-        )
+        await update.message.reply_text("Nenhuma memória salva ainda.")
         return
 
-    text = "🧠 MEMÓRIAS ATUAIS:\n\n"
-
+    text = "🧠 MEMÓRIAS:\n\n"
     for key, value in memory.items():
         text += f"• {key}: {value}\n"
 
     await update.message.reply_text(text)
 
-# =========================================
-
 async def limpar_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     save_memory({})
+    await update.message.reply_text("Memória apagada com sucesso.")
 
-    await update.message.reply_text(
-        "Memória apagada com sucesso."
-    )
+async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt = " ".join(context.args)
 
-# =========================================
+    if not prompt:
+        await update.message.reply_text("Use assim:\n/imagem carro futurista neon")
+        return
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🎨 Gerando imagem gratuita...")
 
-    memory = load_memory()
+    image_url = gerar_url_imagem(prompt)
 
-    status_text = f"""
-🚀 STREETCORE AI STATUS
-
-Sistema: ONLINE
-IA: Groq
-Memória: ATIVA
-Perfil carregado: {len(memory)} itens
-Modo: CEO EXECUTIVO
-"""
-
-    await update.message.reply_text(status_text)
-
-# =========================================
-# CHAT
-# =========================================
+    await update.message.reply_photo(photo=image_url)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_message = update.message.text
 
     memory = load_memory()
-
-    # AUTO MEMORY
     auto_memory(user_message, memory)
 
-    memory_text = json.dumps(
-        memory,
-        ensure_ascii=False,
-        indent=2
-    )
+    memory_text = json.dumps(memory, ensure_ascii=False, indent=2)
 
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",
-                "content":
-                MASTER_PROMPT +
-                f"\n\nMEMÓRIA DO USUÁRIO:\n{memory_text}"
+                "content": MASTER_PROMPT + f"\n\nMEMÓRIA DO USUÁRIO:\n{memory_text}"
             },
             {
                 "role": "user",
@@ -242,29 +142,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     reply = completion.choices[0].message.content
-
     await update.message.reply_text(reply)
 
-# =========================================
-# APP
-# =========================================
-
-app = ApplicationBuilder().token(
-    TELEGRAM_TOKEN
-).build()
+app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("status", status))
 app.add_handler(CommandHandler("memoria", memoria))
 app.add_handler(CommandHandler("limparmemoria", limpar_memoria))
-app.add_handler(CommandHandler("status", status))
+app.add_handler(CommandHandler("imagem", imagem))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_message
-    )
-)
-
-print("🔥 StreetCore AI ONLINE")
-
+print("🔥 StreetCore AI com imagem grátis ONLINE")
 app.run_polling()
