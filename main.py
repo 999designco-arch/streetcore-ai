@@ -7,11 +7,11 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v22-free")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v23-free")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 
-DB_PATH = "streetcore_v22.db"
+DB_PATH = "streetcore_v23.db"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -66,15 +66,7 @@ def iniciar_banco():
 
     conn.commit()
     conn.close()
-    print("✅ Banco V22 iniciado.")
-
-
-def salvar_log(msg):
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO logs (mensagem) VALUES (?)", (msg,))
-    conn.commit()
-    conn.close()
+    print("✅ Banco V23 iniciado.")
 
 
 def contar(tabela):
@@ -103,14 +95,146 @@ def financeiro():
 def listar(tabela):
     conn = db()
     cur = conn.cursor()
-    cur.execute(f"SELECT * FROM {tabela} ORDER BY id DESC LIMIT 20")
+    cur.execute(f"SELECT * FROM {tabela} ORDER BY id DESC LIMIT 30")
     dados = cur.fetchall()
     conn.close()
     return dados
 
 
+def salvar_log(msg):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO logs (mensagem) VALUES (?)", (msg,))
+    conn.commit()
+    conn.close()
+
+
 def login_required():
     return session.get("logado") is True
+
+
+def layout_base(conteudo):
+    return f"""
+    <html>
+    <head>
+        <title>StreetCore OS V23</title>
+        <style>
+            body {{
+                margin:0;
+                background:#050505;
+                color:white;
+                font-family:Arial, sans-serif;
+            }}
+
+            .sidebar {{
+                position:fixed;
+                left:0;
+                top:0;
+                bottom:0;
+                width:230px;
+                background:#0d0d0d;
+                border-right:1px solid #222;
+                padding:25px;
+            }}
+
+            .sidebar h2 {{
+                color:#00ff88;
+            }}
+
+            .sidebar a {{
+                display:block;
+                color:white;
+                text-decoration:none;
+                margin:14px 0;
+            }}
+
+            .sidebar a:hover {{
+                color:#00ff88;
+            }}
+
+            .main {{
+                margin-left:280px;
+                padding:30px;
+            }}
+
+            .grid {{
+                display:grid;
+                grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+                gap:18px;
+            }}
+
+            .card {{
+                background:#111;
+                border:1px solid #333;
+                border-radius:18px;
+                padding:22px;
+            }}
+
+            .big {{
+                font-size:38px;
+                color:#00ff88;
+                font-weight:bold;
+            }}
+
+            .ok {{
+                color:#00ff88;
+                font-weight:bold;
+            }}
+
+            table {{
+                width:100%;
+                border-collapse:collapse;
+                background:#111;
+                border-radius:12px;
+                overflow:hidden;
+            }}
+
+            th, td {{
+                padding:12px;
+                border-bottom:1px solid #333;
+                text-align:left;
+            }}
+
+            input {{
+                padding:12px;
+                border-radius:10px;
+                border:0;
+                margin:6px;
+                background:#1c1c1c;
+                color:white;
+            }}
+
+            button {{
+                padding:12px 18px;
+                border:0;
+                border-radius:10px;
+                background:#00ff88;
+                font-weight:bold;
+            }}
+
+            a {{
+                color:#00ff88;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="sidebar">
+            <h2>🔥 StreetCore</h2>
+            <a href="/">Dashboard</a>
+            <a href="/pedidos">Pedidos</a>
+            <a href="/leads">Leads</a>
+            <a href="/financeiro-web">Financeiro</a>
+            <a href="/logs">Logs</a>
+            <a href="/health">Health</a>
+            <a href="/logout">Sair</a>
+        </div>
+
+        <div class="main">
+            {conteudo}
+        </div>
+    </body>
+    </html>
+    """
 
 
 @app.route("/")
@@ -120,87 +244,47 @@ def home():
 
     receita, despesa, lucro = financeiro()
 
-    return f"""
-    <html>
-    <head>
-        <title>StreetCore OS V22</title>
-        <style>
-            body {{
-                background:#050505;
-                color:white;
-                font-family:Arial;
-                padding:30px;
-            }}
-            .grid {{
-                display:grid;
-                grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-                gap:16px;
-            }}
-            .card {{
-                background:#111;
-                border:1px solid #333;
-                border-radius:16px;
-                padding:20px;
-            }}
-            .ok {{ color:#00ff88; font-weight:bold; }}
-            a {{ color:#00ff88; text-decoration:none; }}
-            button {{
-                background:#00ff88;
-                border:0;
-                padding:10px 18px;
-                border-radius:10px;
-                font-weight:bold;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>🔥 STREETCORE OS V22 ENTERPRISE FREE</h1>
-        <p class="ok">Painel protegido online.</p>
+    conteudo = f"""
+    <h1>🔥 STREETCORE OS V23 ENTERPRISE FREE</h1>
+    <p class="ok">Painel visual profissional online.</p>
 
-        <div class="grid">
-            <div class="card">
-                <h2>Pedidos</h2>
-                <h1>{contar("pedidos")}</h1>
-                <a href="/pedidos">Ver pedidos</a>
-            </div>
-
-            <div class="card">
-                <h2>Leads</h2>
-                <h1>{contar("leads")}</h1>
-                <a href="/leads">Ver leads</a>
-            </div>
-
-            <div class="card">
-                <h2>Receita</h2>
-                <h1>R$ {receita:.2f}</h1>
-            </div>
-
-            <div class="card">
-                <h2>Despesa</h2>
-                <h1>R$ {despesa:.2f}</h1>
-            </div>
-
-            <div class="card">
-                <h2>Lucro</h2>
-                <h1>R$ {lucro:.2f}</h1>
-            </div>
-
-            <div class="card">
-                <h2>Sistema</h2>
-                <p>Telegram ativo</p>
-                <p>Flask ativo</p>
-                <p>SQLite ativo</p>
-                <p>Railway ativo</p>
-            </div>
+    <div class="grid">
+        <div class="card">
+            <h2>Pedidos</h2>
+            <div class="big">{contar("pedidos")}</div>
         </div>
 
-        <br>
-        <a href="/logs">Logs</a> |
-        <a href="/health">Health</a> |
-        <a href="/logout">Sair</a>
-    </body>
-    </html>
+        <div class="card">
+            <h2>Leads</h2>
+            <div class="big">{contar("leads")}</div>
+        </div>
+
+        <div class="card">
+            <h2>Receita</h2>
+            <div class="big">R$ {receita:.2f}</div>
+        </div>
+
+        <div class="card">
+            <h2>Despesa</h2>
+            <div class="big">R$ {despesa:.2f}</div>
+        </div>
+
+        <div class="card">
+            <h2>Lucro</h2>
+            <div class="big">R$ {lucro:.2f}</div>
+        </div>
+
+        <div class="card">
+            <h2>Status</h2>
+            <p>✅ Telegram online</p>
+            <p>✅ Flask online</p>
+            <p>✅ Railway online</p>
+            <p>✅ SQLite ativo</p>
+        </div>
+    </div>
     """
+
+    return layout_base(conteudo)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -213,18 +297,25 @@ def login():
             session["logado"] = True
             return redirect("/")
 
-        return "<h2>Login incorreto</h2><a href='/login'>Voltar</a>"
+        erro = "<p style='color:red;'>Login incorreto</p>"
+    else:
+        erro = ""
 
-    return """
+    return f"""
     <html>
-    <body style="background:#050505;color:white;font-family:Arial;padding:30px;">
-        <h1>🔐 Login StreetCore OS</h1>
-        <form method="POST">
-            <input name="usuario" placeholder="Usuário" style="padding:12px;"><br><br>
-            <input name="senha" type="password" placeholder="Senha" style="padding:12px;"><br><br>
-            <button style="padding:12px 22px;">Entrar</button>
-        </form>
-        <p>Padrão: admin / streetcore</p>
+    <body style="background:#050505;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;">
+        <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:320px;">
+            <h1>🔥 StreetCore</h1>
+            <p>Painel V23 Enterprise Free</p>
+            {erro}
+            <form method="POST">
+                <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
+                <input name="senha" type="password" placeholder="Senha" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
+                <button style="width:100%;padding:14px;border:0;border-radius:10px;background:#00ff88;font-weight:bold;">Entrar</button>
+            </form>
+            <p>Usuário: admin</p>
+            <p>Senha: streetcore</p>
+        </div>
     </body>
     </html>
     """
@@ -240,7 +331,7 @@ def logout():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V22 Enterprise Free"
+        "version": "StreetCore OS V23 Enterprise Free"
     })
 
 
@@ -250,8 +341,27 @@ def pedidos_page():
         return redirect("/login")
 
     dados = listar("pedidos")
-    texto = "\n".join([str(d) for d in dados]) or "Nenhum pedido."
-    return f"<pre>{texto}</pre><a href='/'>Voltar</a>"
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td></tr>"
+        for d in dados
+    ])
+
+    conteudo = f"""
+    <h1>📦 Pedidos</h1>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Pedido</th>
+            <th>Status</th>
+            <th>Data</th>
+        </tr>
+        {linhas}
+    </table>
+    """
+
+    return layout_base(conteudo)
 
 
 @app.route("/leads")
@@ -260,8 +370,59 @@ def leads_page():
         return redirect("/login")
 
     dados = listar("leads")
-    texto = "\n".join([str(d) for d in dados]) or "Nenhum lead."
-    return f"<pre>{texto}</pre><a href='/'>Voltar</a>"
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    conteudo = f"""
+    <h1>🎯 Leads</h1>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Origem</th>
+            <th>Status</th>
+            <th>Data</th>
+        </tr>
+        {linhas}
+    </table>
+    """
+
+    return layout_base(conteudo)
+
+
+@app.route("/financeiro-web")
+def financeiro_web():
+    if not login_required():
+        return redirect("/login")
+
+    receita, despesa, lucro = financeiro()
+
+    conteudo = f"""
+    <h1>💵 Financeiro</h1>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Receita</h2>
+            <div class="big">R$ {receita:.2f}</div>
+        </div>
+
+        <div class="card">
+            <h2>Despesa</h2>
+            <div class="big">R$ {despesa:.2f}</div>
+        </div>
+
+        <div class="card">
+            <h2>Lucro</h2>
+            <div class="big">R$ {lucro:.2f}</div>
+        </div>
+    </div>
+    """
+
+    return layout_base(conteudo)
 
 
 @app.route("/logs")
@@ -270,13 +431,31 @@ def logs_page():
         return redirect("/login")
 
     dados = listar("logs")
-    texto = "\n".join([str(d) for d in dados]) or "Nenhum log."
-    return f"<pre>{texto}</pre><a href='/'>Voltar</a>"
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td></tr>"
+        for d in dados
+    ])
+
+    conteudo = f"""
+    <h1>🧾 Logs</h1>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Mensagem</th>
+            <th>Data</th>
+        </tr>
+        {linhas}
+    </table>
+    """
+
+    return layout_base(conteudo)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V22 ENTERPRISE FREE\n\n"
+        "🔥 STREETCORE OS V23 ENTERPRISE FREE\n\n"
         "Comandos:\n"
         "/pedido camiseta personalizada\n"
         "/pedidos\n"
@@ -291,7 +470,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ StreetCore OS V22 online.")
+    await update.message.reply_text("✅ StreetCore OS V23 online.")
 
 
 async def pedido(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -412,7 +591,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     salvar_log(mensagem)
 
     await update.message.reply_text(
-        "🤖 STREETCORE IA V22\n\n"
+        "🤖 STREETCORE IA V23\n\n"
         "Recebi sua mensagem. Use /start para ver os comandos."
     )
 
@@ -432,11 +611,11 @@ async def telegram_main():
     bot.add_handler(CommandHandler("post", post))
     bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V22...")
+    print("🔥 Telegram iniciando V23...")
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V22")
+    print("✅ Telegram ONLINE V23")
 
     await asyncio.Event().wait()
 
