@@ -20,12 +20,16 @@ from services.scheduler_service import executar_scheduler
 from services.report_service import gerar_relatorio
 from services.calendar_service import criar_evento, listar_eventos
 from services.client_service import criar_cliente, listar_clientes
-from services.finance_service import adicionar_receita, resumo_financeiro
+from services.finance_service import adicionar_receita, adicionar_despesa, resumo_financeiro
 
 from services.order_service import criar_pedido, listar_pedidos, atualizar_status_pedido
 from services.quote_service import criar_orcamento, listar_orcamentos
 from services.inventory_service import adicionar_estoque, listar_estoque
 from services.notification_service import criar_notificacao, listar_notificacoes
+
+from services.supplier_service import criar_fornecedor, listar_fornecedores
+from services.production_service import criar_producao, listar_producao, atualizar_producao
+from services.backup_service import criar_backup, listar_backups
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -43,7 +47,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V17 FREE"
+        "version": "StreetCore OS V18 FREE"
     })
 
 @app.route("/analytics")
@@ -67,7 +71,7 @@ def calendar():
     return f"<pre>{listar_eventos()}</pre>"
 
 @app.route("/finance")
-def finance():
+def finance_page():
     return f"<pre>{resumo_financeiro()}</pre>"
 
 @app.route("/orders")
@@ -79,16 +83,28 @@ def quotes():
     return f"<pre>{listar_orcamentos()}</pre>"
 
 @app.route("/stock")
-def stock():
+def stock_page():
     return f"<pre>{listar_estoque()}</pre>"
 
 @app.route("/notifications")
 def notifications():
     return f"<pre>{listar_notificacoes()}</pre>"
 
+@app.route("/suppliers")
+def suppliers():
+    return f"<pre>{listar_fornecedores()}</pre>"
+
+@app.route("/production")
+def production_page():
+    return f"<pre>{listar_producao()}</pre>"
+
+@app.route("/backups")
+def backups_page():
+    return f"<pre>{listar_backups()}</pre>"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V17 FREE\n\n"
+        "🔥 STREETCORE OS V18 FREE\n\n"
         "COMANDOS:\n"
         "/task criar campanha\n"
         "/tasks\n"
@@ -99,6 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/event live_hoje 20h\n"
         "/calendar\n"
         "/finance 100\n"
+        "/expense 50\n"
         "/report\n"
         "/order pedido de camiseta\n"
         "/orders\n"
@@ -108,7 +125,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/stock camiseta 10\n"
         "/stocklist\n"
         "/notify novo pedido recebido\n"
-        "/notifications"
+        "/notifications\n"
+        "/supplier fornecedor camisetas\n"
+        "/suppliers\n"
+        "/production camiseta cliente joao\n"
+        "/productions\n"
+        "/productionstatus 1 finalizado\n"
+        "/backup\n"
+        "/backups"
     )
 
 async def task(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -156,6 +180,17 @@ async def finance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Use assim: /finance 100")
 
+async def expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Use assim: /expense 50")
+        return
+
+    try:
+        valor = float(context.args[0].replace(",", "."))
+        await update.message.reply_text(adicionar_despesa(valor))
+    except ValueError:
+        await update.message.reply_text("Use assim: /expense 50")
+
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_relatorio())
 
@@ -190,6 +225,7 @@ async def stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     item = context.args[0]
+
     try:
         quantidade = int(context.args[1])
     except ValueError:
@@ -213,6 +249,35 @@ async def notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def notifications_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_notificacoes())
 
+async def supplier(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    nome = " ".join(context.args)
+    await update.message.reply_text(criar_fornecedor(nome))
+
+async def suppliers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_fornecedores())
+
+async def production(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    nome = " ".join(context.args)
+    await update.message.reply_text(criar_producao(nome))
+
+async def productions_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_producao())
+
+async def productionstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /productionstatus 1 finalizado")
+        return
+
+    producao_id = context.args[0]
+    status = " ".join(context.args[1:])
+    await update.message.reply_text(atualizar_producao(producao_id, status))
+
+async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(criar_backup())
+
+async def backups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_backups())
+
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem = update.message.text
     salvar_memoria(mensagem)
@@ -234,6 +299,7 @@ async def telegram_main():
     telegram_app.add_handler(CommandHandler("event", event))
     telegram_app.add_handler(CommandHandler("calendar", calendar_cmd))
     telegram_app.add_handler(CommandHandler("finance", finance))
+    telegram_app.add_handler(CommandHandler("expense", expense))
     telegram_app.add_handler(CommandHandler("report", report))
     telegram_app.add_handler(CommandHandler("order", order))
     telegram_app.add_handler(CommandHandler("orders", orders_cmd))
@@ -244,13 +310,20 @@ async def telegram_main():
     telegram_app.add_handler(CommandHandler("stocklist", stocklist))
     telegram_app.add_handler(CommandHandler("notify", notify))
     telegram_app.add_handler(CommandHandler("notifications", notifications_cmd))
+    telegram_app.add_handler(CommandHandler("supplier", supplier))
+    telegram_app.add_handler(CommandHandler("suppliers", suppliers_cmd))
+    telegram_app.add_handler(CommandHandler("production", production))
+    telegram_app.add_handler(CommandHandler("productions", productions_cmd))
+    telegram_app.add_handler(CommandHandler("productionstatus", productionstatus))
+    telegram_app.add_handler(CommandHandler("backup", backup))
+    telegram_app.add_handler(CommandHandler("backups", backups))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V17 FREE...")
+    print("🔥 Telegram iniciando V18 FREE...")
     await telegram_app.initialize()
     await telegram_app.start()
     await telegram_app.updater.start_polling()
-    print("✅ Telegram ONLINE V17 FREE")
+    print("✅ Telegram ONLINE V18 FREE")
 
     await asyncio.Event().wait()
 
