@@ -7,11 +7,11 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v23-free")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v24-free")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 
-DB_PATH = "streetcore_v23.db"
+DB_PATH = "streetcore_v24.db"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -52,6 +52,7 @@ def iniciar_banco():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tipo TEXT,
             valor REAL,
+            descricao TEXT,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -66,7 +67,19 @@ def iniciar_banco():
 
     conn.commit()
     conn.close()
-    print("✅ Banco V23 iniciado.")
+    print("✅ Banco V24 iniciado.")
+
+
+def login_required():
+    return session.get("logado") is True
+
+
+def salvar_log(msg):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO logs (mensagem) VALUES (?)", (msg,))
+    conn.commit()
+    conn.close()
 
 
 def contar(tabela):
@@ -76,6 +89,15 @@ def contar(tabela):
     total = cur.fetchone()[0]
     conn.close()
     return total
+
+
+def listar(tabela):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute(f"SELECT * FROM {tabela} ORDER BY id DESC LIMIT 50")
+    dados = cur.fetchall()
+    conn.close()
+    return dados
 
 
 def financeiro():
@@ -89,134 +111,141 @@ def financeiro():
     despesa = cur.fetchone()[0] or 0
 
     conn.close()
+
     return receita, despesa, receita - despesa
 
 
-def listar(tabela):
+def buscar_geral(termo):
     conn = db()
     cur = conn.cursor()
-    cur.execute(f"SELECT * FROM {tabela} ORDER BY id DESC LIMIT 30")
-    dados = cur.fetchall()
-    conn.close()
-    return dados
 
+    termo_like = f"%{termo}%"
 
-def salvar_log(msg):
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO logs (mensagem) VALUES (?)", (msg,))
-    conn.commit()
+    cur.execute("SELECT id, nome, status, criado_em FROM pedidos WHERE nome LIKE ? LIMIT 20", (termo_like,))
+    pedidos = cur.fetchall()
+
+    cur.execute("SELECT id, nome, origem, status, criado_em FROM leads WHERE nome LIKE ? OR origem LIKE ? LIMIT 20", (termo_like, termo_like))
+    leads = cur.fetchall()
+
     conn.close()
 
-
-def login_required():
-    return session.get("logado") is True
+    return pedidos, leads
 
 
-def layout_base(conteudo):
+def layout(conteudo):
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V23</title>
+        <title>StreetCore OS V24</title>
         <style>
             body {{
-                margin:0;
-                background:#050505;
-                color:white;
-                font-family:Arial, sans-serif;
+                margin: 0;
+                background: #050505;
+                color: white;
+                font-family: Arial, sans-serif;
             }}
 
             .sidebar {{
-                position:fixed;
-                left:0;
-                top:0;
-                bottom:0;
-                width:230px;
-                background:#0d0d0d;
-                border-right:1px solid #222;
-                padding:25px;
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 240px;
+                background: #0b0b0b;
+                border-right: 1px solid #222;
+                padding: 24px;
             }}
 
             .sidebar h2 {{
-                color:#00ff88;
+                color: #00ff88;
             }}
 
             .sidebar a {{
-                display:block;
-                color:white;
-                text-decoration:none;
-                margin:14px 0;
+                display: block;
+                color: white;
+                text-decoration: none;
+                margin: 13px 0;
             }}
 
             .sidebar a:hover {{
-                color:#00ff88;
+                color: #00ff88;
             }}
 
             .main {{
-                margin-left:280px;
-                padding:30px;
+                margin-left: 290px;
+                padding: 30px;
             }}
 
             .grid {{
-                display:grid;
-                grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-                gap:18px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+                gap: 18px;
             }}
 
             .card {{
-                background:#111;
-                border:1px solid #333;
-                border-radius:18px;
-                padding:22px;
+                background: #111;
+                border: 1px solid #333;
+                border-radius: 18px;
+                padding: 22px;
+                margin-bottom: 18px;
             }}
 
             .big {{
-                font-size:38px;
-                color:#00ff88;
-                font-weight:bold;
+                color: #00ff88;
+                font-size: 38px;
+                font-weight: bold;
             }}
 
             .ok {{
-                color:#00ff88;
-                font-weight:bold;
+                color: #00ff88;
+                font-weight: bold;
             }}
 
-            table {{
-                width:100%;
-                border-collapse:collapse;
-                background:#111;
-                border-radius:12px;
-                overflow:hidden;
-            }}
-
-            th, td {{
-                padding:12px;
-                border-bottom:1px solid #333;
-                text-align:left;
-            }}
-
-            input {{
-                padding:12px;
-                border-radius:10px;
-                border:0;
-                margin:6px;
-                background:#1c1c1c;
-                color:white;
+            input, select {{
+                padding: 12px;
+                border-radius: 10px;
+                border: 0;
+                margin: 6px 0;
+                width: 100%;
+                background: #1c1c1c;
+                color: white;
             }}
 
             button {{
-                padding:12px 18px;
-                border:0;
-                border-radius:10px;
-                background:#00ff88;
-                font-weight:bold;
+                padding: 12px 18px;
+                border: 0;
+                border-radius: 10px;
+                background: #00ff88;
+                font-weight: bold;
+                cursor: pointer;
+            }}
+
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                background: #111;
+                border-radius: 14px;
+                overflow: hidden;
+            }}
+
+            th, td {{
+                padding: 12px;
+                border-bottom: 1px solid #333;
+                text-align: left;
+            }}
+
+            .tag {{
+                background: #1f1f1f;
+                padding: 6px 10px;
+                border-radius: 8px;
             }}
 
             a {{
-                color:#00ff88;
+                color: #00ff88;
             }}
         </style>
     </head>
+
     <body>
         <div class="sidebar">
             <h2>🔥 StreetCore</h2>
@@ -224,6 +253,8 @@ def layout_base(conteudo):
             <a href="/pedidos">Pedidos</a>
             <a href="/leads">Leads</a>
             <a href="/financeiro-web">Financeiro</a>
+            <a href="/criar">Criar</a>
+            <a href="/buscar">Buscar</a>
             <a href="/logs">Logs</a>
             <a href="/health">Health</a>
             <a href="/logout">Sair</a>
@@ -245,18 +276,20 @@ def home():
     receita, despesa, lucro = financeiro()
 
     conteudo = f"""
-    <h1>🔥 STREETCORE OS V23 ENTERPRISE FREE</h1>
-    <p class="ok">Painel visual profissional online.</p>
+    <h1>🔥 STREETCORE OS V24 MASTER PANEL</h1>
+    <p class="ok">Painel com ações, busca, pedidos, leads e financeiro.</p>
 
     <div class="grid">
         <div class="card">
             <h2>Pedidos</h2>
             <div class="big">{contar("pedidos")}</div>
+            <a href="/pedidos">Ver pedidos</a>
         </div>
 
         <div class="card">
             <h2>Leads</h2>
             <div class="big">{contar("leads")}</div>
+            <a href="/leads">Ver leads</a>
         </div>
 
         <div class="card">
@@ -282,13 +315,21 @@ def home():
             <p>✅ SQLite ativo</p>
         </div>
     </div>
+
+    <div class="card">
+        <h2>Ações rápidas</h2>
+        <a href="/criar">Criar pedido, lead, receita ou despesa</a><br>
+        <a href="/buscar">Buscar informações</a>
+    </div>
     """
 
-    return layout_base(conteudo)
+    return layout(conteudo)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    erro = ""
+
     if request.method == "POST":
         usuario = request.form.get("usuario")
         senha = request.form.get("senha")
@@ -297,24 +338,22 @@ def login():
             session["logado"] = True
             return redirect("/")
 
-        erro = "<p style='color:red;'>Login incorreto</p>"
-    else:
-        erro = ""
+        erro = "<p style='color:red;'>Login incorreto.</p>"
 
     return f"""
     <html>
     <body style="background:#050505;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;">
-        <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:320px;">
+        <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:330px;">
             <h1>🔥 StreetCore</h1>
-            <p>Painel V23 Enterprise Free</p>
+            <p>V24 Master Panel</p>
             {erro}
             <form method="POST">
                 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
                 <input name="senha" type="password" placeholder="Senha" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
                 <button style="width:100%;padding:14px;border:0;border-radius:10px;background:#00ff88;font-weight:bold;">Entrar</button>
             </form>
-            <p>Usuário: admin</p>
-            <p>Senha: streetcore</p>
+            <p>Usuário padrão: admin</p>
+            <p>Senha padrão: streetcore</p>
         </div>
     </body>
     </html>
@@ -331,8 +370,71 @@ def logout():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V23 Enterprise Free"
+        "version": "StreetCore OS V24 Master Panel"
     })
+
+
+@app.route("/criar", methods=["GET", "POST"])
+def criar_web():
+    if not login_required():
+        return redirect("/login")
+
+    mensagem = ""
+
+    if request.method == "POST":
+        tipo = request.form.get("tipo")
+        nome = request.form.get("nome")
+        valor = request.form.get("valor")
+
+        conn = db()
+        cur = conn.cursor()
+
+        if tipo == "pedido":
+            cur.execute("INSERT INTO pedidos (nome) VALUES (?)", (nome,))
+            mensagem = "Pedido criado."
+
+        elif tipo == "lead":
+            cur.execute("INSERT INTO leads (nome, origem) VALUES (?, ?)", (nome, "painel"))
+            mensagem = "Lead criado."
+
+        elif tipo == "receita":
+            cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("receita", float(valor), nome))
+            mensagem = "Receita adicionada."
+
+        elif tipo == "despesa":
+            cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", float(valor), nome))
+            mensagem = "Despesa adicionada."
+
+        conn.commit()
+        conn.close()
+        salvar_log(f"Ação web: {tipo} - {nome}")
+
+    conteudo = f"""
+    <h1>➕ Criar</h1>
+    <div class="card">
+        <p class="ok">{mensagem}</p>
+
+        <form method="POST">
+            <label>Tipo</label>
+            <select name="tipo">
+                <option value="pedido">Pedido</option>
+                <option value="lead">Lead</option>
+                <option value="receita">Receita</option>
+                <option value="despesa">Despesa</option>
+            </select>
+
+            <label>Nome/Descrição</label>
+            <input name="nome" placeholder="Ex: camiseta personalizada">
+
+            <label>Valor, se for financeiro</label>
+            <input name="valor" placeholder="Ex: 100">
+
+            <button>Criar</button>
+        </form>
+    </div>
+    """
+
+    return layout(conteudo)
 
 
 @app.route("/pedidos")
@@ -343,25 +445,52 @@ def pedidos_page():
     dados = listar("pedidos")
 
     linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td></tr>"
+        f"""
+        <tr>
+            <td>{d[0]}</td>
+            <td>{d[1]}</td>
+            <td><span class="tag">{d[2]}</span></td>
+            <td>{d[3]}</td>
+            <td>
+                <a href="/pedido-status/{d[0]}/em_producao">Produção</a> |
+                <a href="/pedido-status/{d[0]}/finalizado">Finalizar</a>
+            </td>
+        </tr>
+        """
         for d in dados
     ])
 
     conteudo = f"""
     <h1>📦 Pedidos</h1>
-
     <table>
         <tr>
             <th>ID</th>
             <th>Pedido</th>
             <th>Status</th>
             <th>Data</th>
+            <th>Ações</th>
         </tr>
         {linhas}
     </table>
     """
 
-    return layout_base(conteudo)
+    return layout(conteudo)
+
+
+@app.route("/pedido-status/<int:pedido_id>/<status>")
+def pedido_status(pedido_id, status):
+    if not login_required():
+        return redirect("/login")
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("UPDATE pedidos SET status=? WHERE id=?", (status, pedido_id))
+    conn.commit()
+    conn.close()
+
+    salvar_log(f"Pedido {pedido_id} atualizado para {status}")
+
+    return redirect("/pedidos")
 
 
 @app.route("/leads")
@@ -372,13 +501,20 @@ def leads_page():
     dados = listar("leads")
 
     linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        f"""
+        <tr>
+            <td>{d[0]}</td>
+            <td>{d[1]}</td>
+            <td>{d[2]}</td>
+            <td><span class="tag">{d[3]}</span></td>
+            <td>{d[4]}</td>
+        </tr>
+        """
         for d in dados
     ])
 
     conteudo = f"""
     <h1>🎯 Leads</h1>
-
     <table>
         <tr>
             <th>ID</th>
@@ -391,7 +527,7 @@ def leads_page():
     </table>
     """
 
-    return layout_base(conteudo)
+    return layout(conteudo)
 
 
 @app.route("/financeiro-web")
@@ -422,7 +558,42 @@ def financeiro_web():
     </div>
     """
 
-    return layout_base(conteudo)
+    return layout(conteudo)
+
+
+@app.route("/buscar", methods=["GET", "POST"])
+def buscar_page():
+    if not login_required():
+        return redirect("/login")
+
+    resultado = ""
+
+    if request.method == "POST":
+        termo = request.form.get("termo")
+        pedidos, leads = buscar_geral(termo)
+
+        resultado += "<h2>Pedidos encontrados</h2>"
+        resultado += "<pre>" + ("\n".join([str(p) for p in pedidos]) or "Nenhum pedido.") + "</pre>"
+
+        resultado += "<h2>Leads encontrados</h2>"
+        resultado += "<pre>" + ("\n".join([str(l) for l in leads]) or "Nenhum lead.") + "</pre>"
+
+    conteudo = f"""
+    <h1>🔎 Buscar</h1>
+
+    <div class="card">
+        <form method="POST">
+            <input name="termo" placeholder="Digite algo para buscar">
+            <button>Buscar</button>
+        </form>
+    </div>
+
+    <div class="card">
+        {resultado}
+    </div>
+    """
+
+    return layout(conteudo)
 
 
 @app.route("/logs")
@@ -450,15 +621,16 @@ def logs_page():
     </table>
     """
 
-    return layout_base(conteudo)
+    return layout(conteudo)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V23 ENTERPRISE FREE\n\n"
+        "🔥 STREETCORE OS V24 MASTER PANEL\n\n"
         "Comandos:\n"
         "/pedido camiseta personalizada\n"
         "/pedidos\n"
+        "/pedido_status 1 finalizado\n"
         "/lead joao instagram\n"
         "/leads\n"
         "/receita 100\n"
@@ -470,7 +642,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ StreetCore OS V23 online.")
+    await update.message.reply_text("✅ StreetCore OS V24 online.")
 
 
 async def pedido(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -494,6 +666,23 @@ async def pedidos_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dados = listar("pedidos")
     texto = "\n".join([str(d) for d in dados]) or "Nenhum pedido."
     await update.message.reply_text(texto)
+
+
+async def pedido_status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /pedido_status 1 finalizado")
+        return
+
+    pedido_id = context.args[0]
+    status_novo = " ".join(context.args[1:])
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("UPDATE pedidos SET status=? WHERE id=?", (status_novo, pedido_id))
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(f"✅ Pedido #{pedido_id} atualizado para {status_novo}")
 
 
 async def lead(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -533,8 +722,8 @@ async def receita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = db()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO financeiro (tipo, valor) VALUES (?, ?)",
-        ("receita", valor)
+        "INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)",
+        ("receita", valor, "telegram")
     )
     conn.commit()
     conn.close()
@@ -552,8 +741,8 @@ async def despesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = db()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO financeiro (tipo, valor) VALUES (?, ?)",
-        ("despesa", valor)
+        "INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)",
+        ("despesa", valor, "telegram")
     )
     conn.commit()
     conn.close()
@@ -591,7 +780,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     salvar_log(mensagem)
 
     await update.message.reply_text(
-        "🤖 STREETCORE IA V23\n\n"
+        "🤖 STREETCORE IA V24\n\n"
         "Recebi sua mensagem. Use /start para ver os comandos."
     )
 
@@ -603,6 +792,7 @@ async def telegram_main():
     bot.add_handler(CommandHandler("status", status))
     bot.add_handler(CommandHandler("pedido", pedido))
     bot.add_handler(CommandHandler("pedidos", pedidos_cmd))
+    bot.add_handler(CommandHandler("pedido_status", pedido_status_cmd))
     bot.add_handler(CommandHandler("lead", lead))
     bot.add_handler(CommandHandler("leads", leads_cmd))
     bot.add_handler(CommandHandler("receita", receita))
@@ -611,11 +801,11 @@ async def telegram_main():
     bot.add_handler(CommandHandler("post", post))
     bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V23...")
+    print("🔥 Telegram iniciando V24...")
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V23")
+    print("✅ Telegram ONLINE V24")
 
     await asyncio.Event().wait()
 
