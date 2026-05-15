@@ -325,6 +325,53 @@ TABLES = {
         observacao TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
+    "empresas": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        nicho TEXT,
+        status TEXT DEFAULT 'ativa',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "workflow_rules": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        gatilho TEXT,
+        acao TEXT,
+        status TEXT DEFAULT 'ativo',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "whatsapp_queue": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente TEXT,
+        telefone TEXT,
+        mensagem TEXT,
+        status TEXT DEFAULT 'pendente',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "media_prompts": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT,
+        tema TEXT,
+        prompt TEXT,
+        status TEXT DEFAULT 'novo',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "rag_index": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        origem TEXT,
+        titulo TEXT,
+        trecho TEXT,
+        palavras_chave TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "decisoes_ia": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT,
+        decisao TEXT,
+        prioridade TEXT DEFAULT 'normal',
+        status TEXT DEFAULT 'nova',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -396,7 +443,7 @@ def iniciar_banco():
         if not sql("SELECT * FROM agentes WHERE nome=?", (nome,), True):
             sql("INSERT INTO agentes (nome, funcao, ultima_resposta) VALUES (?, ?, ?)", (nome, funcao, "Aguardando primeira execução."))
 
-    print("✅ StreetCore OS V44 LUXURY SAAS PRO iniciado.")
+    print("✅ StreetCore OS V45 OMNI ENTERPRISE AI iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -688,7 +735,7 @@ def relatorio():
     linhas = []
     for tabela in ["pedidos", "leads", "clientes", "propostas", "produtos", "estoque", "producao", "tarefas", "campanhas", "conteudos", "uploads", "atendimentos", "pipeline", "oportunidades"]:
         linhas.append(f"{tabela}: {contar(tabela)}")
-    return "📊 RELATÓRIO V44 LUXURY SAAS PRO\n\n" + "\n".join(linhas) + f"""
+    return "📊 RELATÓRIO V45 OMNI ENTERPRISE AI\n\n" + "\n".join(linhas) + f"""
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -709,7 +756,7 @@ def diagnostico_sistema():
     except Exception:
         estoque_baixo = []
     alertas = [f"{x[0]} ({x[1]}/{x[2]})" for x in estoque_baixo]
-    return f"""🧠 DIAGNÓSTICO V44
+    return f"""🧠 DIAGNÓSTICO V45
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -863,7 +910,7 @@ def scheduler_loop():
 
 def layout(conteudo):
     menu = [
-        ("Chat IA", "/chat"), ("Workspace", "/workspace"), ("Luxury", "/luxury"), ("Templates", "/templates"), ("Contratos", "/contratos"), ("Agenda", "/agenda"), ("Status Pedido", "/status-pedido"), ("Dashboard", "/"), ("Criar", "/criar"),
+        ("Chat IA", "/chat"), ("Workspace", "/workspace"), ("Omni AI", "/omni"), ("CEO", "/ceo"), ("Analytics", "/analytics"), ("Workflows", "/workflows"), ("Memória AI", "/memoria-ai"), ("Mídia IA", "/midia-ai"), ("WhatsApp", "/whatsapp"), ("Empresas", "/empresas"), ("Luxury", "/luxury"), ("Templates", "/templates"), ("Contratos", "/contratos"), ("Agenda", "/agenda"), ("Status Pedido", "/status-pedido"), ("Dashboard", "/"), ("Criar", "/criar"),
         ("Executivo", "/executivo"), ("Quantum", "/quantum"), ("Master", "/master"), ("Ultra", "/ultra"),
         ("Neural", "/neural"), ("Multiagentes", "/multiagentes"), ("Pipeline", "/pipeline"),
         ("Kanban Leads", "/kanban-leads"), ("Kanban Produção", "/kanban-producao"), ("Conteúdo", "/conteudo"),
@@ -879,7 +926,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V44 Luxury SaaS Pro</title>
+<title>StreetCore V45 Omni Enterprise AI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root{{--bg:#212121;--panel:#171717;--card:#262626;--border:#3f3f46;--text:#ececec;--muted:#b4b4b4;--green:#10a37f;}}
@@ -932,7 +979,7 @@ a{{color:#7dd3fc}} pre{{white-space:pre-wrap;line-height:1.55;font-family:ui-mon
 <body>
 <div class="shell">
 <aside class="sidebar">
-<div class="brand"><div class="logo">SG</div><div><h2>StreetCore V44</h2><p>Stable Ultra Pro</p></div></div>
+<div class="brand"><div class="logo">SG</div><div><h2>StreetCore V45</h2><p>Stable Ultra Pro</p></div></div>
 <div class="section-title">Sistema</div>{links}
 <div class="section-title">Tabelas</div><div class="mini-grid">{table_links}</div>
 </aside>
@@ -996,7 +1043,7 @@ def login():
     return f"""
 <body style="background:#212121;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#262626;padding:40px;border-radius:20px;width:350px;border:1px solid #444">
-<h1>🔥 StreetCore V44</h1>{erro}
+<h1>🔥 StreetCore V45</h1>{erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:12px;background:#333;color:white;border:1px solid #555">
 <input name="senha" type="password" placeholder="Senha" style="width:100%;padding:14px;margin-bottom:12px;border-radius:12px;background:#333;color:white;border:1px solid #555">
@@ -1027,7 +1074,7 @@ def home():
     ]
     html = "".join([f"<div class='card'><h2>{t}</h2><div class='big'>{v}</div></div>" for t, v in cards])
     return layout(f"""
-    <h1>🚀 StreetCore V44 Luxury SaaS Pro</h1>
+    <h1>🚀 StreetCore V45 Omni Enterprise AI</h1>
     <p>Painel estável, visual estilo ChatGPT, funções corrigidas e operação organizada.</p>
     <div class="grid">{html}</div>
     <div class="card"><h2>🧠 Centro de decisão</h2><pre>{relatorio_executivo()}</pre></div>
@@ -1036,7 +1083,7 @@ def home():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "online", "version": "V44 LUXURY SAAS PRO", "webhook": bool(WEBHOOK_URL), "ollama": USE_OLLAMA})
+    return jsonify({"status": "online", "version": "V45 OMNI ENTERPRISE AI", "webhook": bool(WEBHOOK_URL), "ollama": USE_OLLAMA})
 
 
 @app.route("/workspace")
@@ -1335,6 +1382,7 @@ def upload():
             texto = extrair_arquivo(path)
             inserir("uploads", "nome, tipo, texto", (nome, nome.split(".")[-1].lower(), texto[:12000]))
             inserir("conhecimento", "titulo, texto", (f"Upload: {nome}", texto[:12000]))
+            indexar_memoria("upload", nome, texto[:12000])
             msg = f"Arquivo salvo e lido: {nome}"
     return layout(f"<h1>📎 Upload</h1><div class='card'><p>{msg}</p><form method='POST' enctype='multipart/form-data'><input type='file' name='arquivo'><button>Enviar</button></form></div><pre>{listar('uploads', 20)}</pre>")
 
@@ -1456,7 +1504,7 @@ def backup():
 
 @app.route("/api/info")
 def api_info():
-    return jsonify({"version": "V44 LUXURY SAAS PRO", "api_key_header": "X-API-Key", "tables": SAFE_TABLES})
+    return jsonify({"version": "V45 OMNI ENTERPRISE AI", "api_key_header": "X-API-Key", "tables": SAFE_TABLES})
 
 
 def api_auth():
@@ -1488,7 +1536,7 @@ async def send(update, texto):
 
 
 async def start_cmd(update, context):
-    await send(update, "🔥 STREETCORE V44\n/chat mensagem\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/post camisetas\n/campanha street graff\n/buscar joao")
+    await send(update, "🔥 STREETCORE V45\n/chat mensagem\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/post camisetas\n/campanha street graff\n/buscar joao")
 
 
 async def chat_cmd(update, context):
@@ -1581,6 +1629,9 @@ async def telegram_main():
         "campanha": campanha_cmd,
         "buscar": buscar_cmd,
         "luxury": luxury_cmd,
+        "omni": omni_cmd,
+        "analytics": analytics_cmd,
+        "ceo": ceo_cmd,
     }
 
     for nome, funcao in comandos.items():
@@ -1589,16 +1640,16 @@ async def telegram_main():
     telegram_app.add_handler(MessageHandler(filters.Document.ALL, documento_cmd))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V44...")
+    print("🔥 Telegram iniciando V45...")
     await telegram_app.initialize()
     await telegram_app.start()
 
     if WEBHOOK_URL:
         await telegram_app.bot.set_webhook(f"{WEBHOOK_URL.rstrip('/')}/telegram-webhook")
-        print("✅ Telegram WEBHOOK ativo V44")
+        print("✅ Telegram WEBHOOK ativo V45")
     else:
         await telegram_app.updater.start_polling()
-        print("✅ Telegram POLLING ativo V44")
+        print("✅ Telegram POLLING ativo V45")
 
     await asyncio.Event().wait()
 
@@ -1611,7 +1662,7 @@ def run_telegram():
 
 
 # =========================
-# V44 LUXURY SAAS PRO EXTRA
+# V45 OMNI ENTERPRISE AI EXTRA
 # =========================
 
 def gerar_contrato_texto(cliente, servico, valor):
@@ -1684,7 +1735,7 @@ def criar_templates_padrao():
 
 def luxury_resumo():
     receita, despesa, lucro = financeiro()
-    return f"""💎 V44 LUXURY SAAS PRO
+    return f"""💎 V45 OMNI ENTERPRISE AI
 
 Status do sistema:
 ✅ Visual ChatGPT Premium
@@ -1728,7 +1779,7 @@ def luxury_page():
     if not login_required():
         return redirect("/login")
     return layout(f"""
-    <h1>💎 V44 Luxury SaaS Pro</h1>
+    <h1>💎 V45 Luxury SaaS Pro</h1>
     <div class="card"><pre>{luxury_resumo()}</pre></div>
     <div class="grid">
         <div class="card"><h2>Templates</h2><p>Modelos prontos para posts, stories e mensagens.</p><a href="/templates">Abrir</a></div>
@@ -1973,6 +2024,481 @@ def acompanhar_publico():
 
 async def luxury_cmd(update, context):
     await send(update, luxury_resumo())
+
+
+# =========================
+# V45 OMNI ENTERPRISE AI EXTRA
+# =========================
+
+def palavras_chave(texto, limite=18):
+    texto = re.sub(r"[^a-zA-ZÀ-ÿ0-9 ]", " ", str(texto or "").lower())
+    stop = set("de da do das dos e o a os as para com por em um uma no na nos nas que se ao aos sua seu suas seus".split())
+    palavras = [p for p in texto.split() if len(p) > 3 and p not in stop]
+    freq = {}
+    for p in palavras:
+        freq[p] = freq.get(p, 0) + 1
+    ordenadas = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+    return ", ".join([p for p, _ in ordenadas[:limite]])
+
+
+def indexar_memoria(origem, titulo, texto):
+    texto = str(texto or "")
+    if not texto.strip():
+        return "Nada para indexar."
+
+    partes = []
+    tamanho = 900
+    for i in range(0, len(texto), tamanho):
+        partes.append(texto[i:i+tamanho])
+
+    total = 0
+    for parte in partes[:20]:
+        inserir("rag_index", "origem, titulo, trecho, palavras_chave", (
+            origem,
+            titulo,
+            parte,
+            palavras_chave(parte)
+        ))
+        total += 1
+
+    return f"Memória indexada: {total} trechos."
+
+
+def busca_memoria_inteligente(pergunta):
+    keys = palavras_chave(pergunta, 10).split(", ")
+    if not keys or keys == [""]:
+        return "Sem palavras-chave suficientes."
+
+    blocos = []
+    for k in keys:
+        dados = sql(
+            "SELECT origem,titulo,trecho,palavras_chave FROM rag_index WHERE palavras_chave LIKE ? OR trecho LIKE ? ORDER BY id DESC LIMIT 5",
+            (f"%{k}%", f"%{k}%"),
+            True
+        )
+        for d in dados:
+            item = f"ORIGEM: {d[0]} | TÍTULO: {d[1]}\n{d[2]}"
+            if item not in blocos:
+                blocos.append(item)
+
+    if not blocos:
+        return buscar(pergunta)
+
+    return "\n\n---\n\n".join(blocos[:8])
+
+
+def omni_responder(pergunta):
+    memoria = busca_memoria_inteligente(pergunta)
+    contexto = relatorio_executivo() if "relatorio_executivo" in globals() else relatorio()
+
+    prompt = f"""
+Você é o StreetCore V45 Omni Enterprise AI.
+Você controla uma operação de personalizados chamada Street Graff.
+
+CONTEXTO:
+{contexto}
+
+MEMÓRIA ENCONTRADA:
+{memoria}
+
+PERGUNTA/ORDEM:
+{pergunta}
+
+Responda em português, com clareza, visão de CEO e ações práticas.
+"""
+
+    ia = ollama(prompt) if "ollama" in globals() else ""
+    if ia:
+        return ia
+
+    texto = str(pergunta or "").lower()
+    if "campanha" in texto or "vender" in texto:
+        return campanha(pergunta)
+    if "relatorio" in texto or "relatório" in texto or "diagnostico" in texto:
+        return contexto
+    if "memoria" in texto or "arquivo" in texto or "pdf" in texto:
+        return memoria
+    return f"""🧠 OMNI ENTERPRISE AI
+
+Entendi sua ordem:
+{pergunta}
+
+Análise rápida:
+{contexto}
+
+Memória relacionada:
+{memoria}
+
+Próximas ações:
+1. Criar ou atualizar lead.
+2. Gerar proposta se houver pedido.
+3. Criar tarefa de follow-up.
+4. Atualizar pipeline.
+5. Criar conteúdo de venda.
+"""
+
+
+def criar_empresa_padrao():
+    if not sql("SELECT id FROM empresas WHERE nome='Street Graff'", fetch=True):
+        inserir("empresas", "nome, nicho, status", ("Street Graff", "personalizados, camisetas, adesivos, canecas, brindes", "ativa"))
+        return "Empresa Street Graff criada."
+    return "Empresa Street Graff já existe."
+
+
+def criar_workflows_padrao_v45():
+    regras = [
+        ("Novo lead quente", "lead_quente", "criar_proposta + criar_followup + avisar_telegram"),
+        ("Proposta aberta", "proposta_aberta", "criar_followup + mover_pipeline"),
+        ("Estoque baixo", "estoque_baixo", "criar_notificacao + criar_tarefa_compra"),
+        ("Conteúdo diário", "todo_dia", "gerar_post + salvar_instagram_queue"),
+        ("Pedido recebido", "pedido_recebido", "criar_producao + criar_status_cliente")
+    ]
+    criadas = 0
+    for nome, gatilho, acao in regras:
+        if not sql("SELECT id FROM workflow_rules WHERE nome=?", (nome,), True):
+            inserir("workflow_rules", "nome, gatilho, acao, status", (nome, gatilho, acao, "ativo"))
+            criadas += 1
+    return f"Workflows padrão verificados. Novos criados: {criadas}"
+
+
+def executar_workflows_v45():
+    resultados = []
+
+    leads = sql("SELECT id,nome,origem,temperatura FROM leads WHERE temperatura='quente' ORDER BY id DESC LIMIT 10", fetch=True)
+    for lead_id, nome, origem, temp in leads:
+        desc = f"Orçamento personalizado para {nome} vindo de {origem}"
+        existe = sql("SELECT id FROM propostas WHERE cliente=? AND descricao=?", (nome, desc), True)
+        if not existe:
+            texto = gerar_proposta(nome, desc)
+            inserir("propostas", "cliente, descricao, valor, texto", (nome, desc, valor_orcamento(desc), texto))
+            inserir("tarefas", "titulo, status, prioridade", (f"Follow-up lead quente: {nome}", "pendente", "alta"))
+            inserir("pipeline", "cliente, etapa, valor, observacao", (nome, "proposta_automatica", valor_orcamento(desc), desc))
+            resultados.append(f"Lead quente processado: {nome}")
+
+    estoque_baixo = sql("SELECT item,quantidade,minimo FROM estoque WHERE quantidade <= minimo LIMIT 10", fetch=True)
+    for item, qtd, minimo in estoque_baixo:
+        inserir("notificacoes", "mensagem, status", (f"Estoque baixo: {item} ({qtd}/{minimo})", "nova"))
+        inserir("tarefas", "titulo, status, prioridade", (f"Comprar/repor estoque: {item}", "pendente", "alta"))
+        resultados.append(f"Alerta de estoque: {item}")
+
+    if not resultados:
+        return "Nenhum workflow precisava ser executado agora."
+
+    inserir("rotinas", "nome, descricao, status", ("workflows_v45", "\n".join(resultados), "ativa"))
+    return "⚙️ WORKFLOWS V45 EXECUTADOS\n\n" + "\n".join(["✅ " + r for r in resultados])
+
+
+def analytics_omni():
+    receita, despesa, lucro = financeiro()
+    leads = contar("leads")
+    pedidos = contar("pedidos")
+    propostas = contar("propostas")
+    conversao = (pedidos / leads * 100) if leads else 0
+    ticket = receita / pedidos if pedidos else 0
+
+    return f"""📈 ANALYTICS OMNI
+
+Receita: R$ {receita:.2f}
+Despesa: R$ {despesa:.2f}
+Lucro: R$ {lucro:.2f}
+
+Leads: {leads}
+Pedidos: {pedidos}
+Propostas: {propostas}
+Conversão estimada: {conversao:.2f}%
+Ticket médio: R$ {ticket:.2f}
+
+Leitura da IA:
+✅ aumentar leads quentes
+✅ melhorar follow-up
+✅ elevar ticket médio
+✅ reduzir tempo de produção
+✅ criar conteúdo diário
+"""
+
+
+def gerar_prompt_midia(tipo, tema):
+    prompt = f"""
+Crie um prompt profissional para gerar {tipo} da marca Street Graff.
+Tema: {tema}
+Estilo: street, moderno, preto e branco, urbano, profissional, alta conversão.
+Produtos: camisetas, adesivos, canecas, panfletos e brindes.
+Formato pronto para IA de imagem/vídeo.
+"""
+    ia = ollama(prompt) if "ollama" in globals() else ""
+    if not ia:
+        ia = f"""PROMPT {tipo.upper()} - STREET GRAFF
+
+Crie uma arte {tipo} em estilo urbano streetwear, fundo escuro, contraste preto e branco, estética premium, mostrando {tema}. Incluir elementos de personalizados: camisetas, adesivos, canecas e brindes. Visual moderno, limpo, chamativo, com espaço para texto promocional e CTA."""
+    inserir("media_prompts", "tipo, tema, prompt, status", (tipo, tema, ia, "novo"))
+    return ia
+
+
+def enviar_whatsapp_fila(cliente, telefone, mensagem):
+    inserir("whatsapp_queue", "cliente, telefone, mensagem, status", (cliente, telefone, mensagem, "pendente"))
+    return "Mensagem adicionada à fila de WhatsApp. Integração real pode ser feita depois com Evolution API/Baileys."
+
+
+def decisao_ceo_omni():
+    analise = analytics_omni()
+    diag = diagnostico_sistema() if "diagnostico_sistema" in globals() else relatorio()
+    decisao = f"""👑 DECISÃO CEO OMNI
+
+{analise}
+
+{diag}
+
+Plano de hoje:
+1. Executar workflows.
+2. Fazer follow-up dos leads quentes.
+3. Gerar 1 campanha de venda.
+4. Criar 1 post, 1 story e 1 reels.
+5. Conferir estoque baixo.
+6. Atualizar produção.
+7. Fechar pelo menos uma proposta.
+"""
+    inserir("decisoes_ia", "tipo, decisao, prioridade, status", ("ceo_omni", decisao, "alta", "nova"))
+    return decisao
+
+
+@app.route("/omni", methods=["GET", "POST"])
+def omni_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        pergunta = request.form.get("pergunta", "")
+        resposta = omni_responder(pergunta)
+        try:
+            inserir("chat_sessions", "usuario, pergunta, resposta", (session.get("usuario", "web"), pergunta, resposta))
+        except Exception:
+            pass
+
+    return layout(f"""
+    <h1>🧠 V45 Omni Enterprise AI</h1>
+    <div class="card">
+        <form method="POST">
+            <textarea name="pergunta" placeholder="Dê uma ordem para a IA Omni..."></textarea>
+            <button>Executar Omni AI</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    """)
+
+
+@app.route("/empresas", methods=["GET", "POST"])
+def empresas_page():
+    if not login_required():
+        return redirect("/login")
+
+    msg = ""
+
+    if request.method == "POST":
+        if request.form.get("acao") == "padrao":
+            msg = criar_empresa_padrao()
+        else:
+            inserir("empresas", "nome, nicho, status", (
+                request.form.get("nome", ""),
+                request.form.get("nicho", ""),
+                request.form.get("status", "ativa")
+            ))
+            msg = "Empresa criada."
+
+    dados = listar("empresas", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>" for d in dados])
+
+    return layout(f"""
+    <h1>🏢 Multiempresa</h1>
+    <div class="card">
+        <p>{msg}</p>
+        <form method="POST">
+            <input name="nome" placeholder="Nome da empresa">
+            <input name="nicho" placeholder="Nicho">
+            <select name="status"><option>ativa</option><option>pausada</option></select>
+            <button>Criar empresa</button>
+        </form>
+        <form method="POST" style="margin-top:10px">
+            <input type="hidden" name="acao" value="padrao">
+            <button>Criar Street Graff padrão</button>
+        </form>
+    </div>
+    <table><tr><th>ID</th><th>Nome</th><th>Nicho</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/memoria-ai", methods=["GET", "POST"])
+def memoria_ai_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "indexar":
+            origem = request.form.get("origem", "manual")
+            titulo = request.form.get("titulo", "Memória manual")
+            texto = request.form.get("texto", "")
+            resposta = indexar_memoria(origem, titulo, texto)
+        else:
+            resposta = busca_memoria_inteligente(request.form.get("pergunta", ""))
+
+    return layout(f"""
+    <h1>🧠 Memória IA / RAG Simples</h1>
+    <div class="grid">
+        <div class="card">
+            <h2>Indexar memória</h2>
+            <form method="POST">
+                <input type="hidden" name="acao" value="indexar">
+                <input name="origem" placeholder="Origem">
+                <input name="titulo" placeholder="Título">
+                <textarea name="texto" placeholder="Texto para memória"></textarea>
+                <button>Indexar</button>
+            </form>
+        </div>
+        <div class="card">
+            <h2>Buscar memória</h2>
+            <form method="POST">
+                <input type="hidden" name="acao" value="buscar">
+                <textarea name="pergunta" placeholder="Pergunte algo sobre a memória"></textarea>
+                <button>Buscar</button>
+            </form>
+        </div>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    """)
+
+
+@app.route("/workflows", methods=["GET", "POST"])
+def workflows_page():
+    if not login_required():
+        return redirect("/login")
+
+    msg = ""
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "padrao":
+            msg = criar_workflows_padrao_v45()
+        elif acao == "executar":
+            msg = executar_workflows_v45()
+        else:
+            inserir("workflow_rules", "nome, gatilho, acao, status", (
+                request.form.get("nome", ""),
+                request.form.get("gatilho", ""),
+                request.form.get("acao_texto", ""),
+                request.form.get("status", "ativo")
+            ))
+            msg = "Workflow criado."
+
+    dados = listar("workflow_rules", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in dados])
+
+    return layout(f"""
+    <h1>⚙️ Workflow Builder</h1>
+    <div class="card">
+        <p>{msg}</p>
+        <form method="POST">
+            <input name="nome" placeholder="Nome do workflow">
+            <input name="gatilho" placeholder="Gatilho">
+            <input name="acao_texto" placeholder="Ação">
+            <select name="status"><option>ativo</option><option>pausado</option></select>
+            <button>Criar workflow</button>
+        </form>
+        <form method="POST" style="margin-top:10px">
+            <input type="hidden" name="acao" value="padrao">
+            <button>Criar workflows padrão</button>
+        </form>
+        <form method="POST" style="margin-top:10px">
+            <input type="hidden" name="acao" value="executar">
+            <button>Executar workflows agora</button>
+        </form>
+    </div>
+    <table><tr><th>ID</th><th>Nome</th><th>Gatilho</th><th>Ação</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/analytics")
+def analytics_page():
+    if not login_required():
+        return redirect("/login")
+    return layout(f"<h1>📈 Analytics Omni</h1><div class='card'><pre>{analytics_omni()}</pre></div>")
+
+
+@app.route("/midia-ai", methods=["GET", "POST"])
+def midia_ai_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        resposta = gerar_prompt_midia(request.form.get("tipo", "imagem"), request.form.get("tema", "Street Graff"))
+
+    dados = listar("media_prompts", 50)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in dados])
+
+    return layout(f"""
+    <h1>🎨 Mídia IA</h1>
+    <div class="card">
+        <form method="POST">
+            <select name="tipo"><option>imagem</option><option>video</option><option>reels</option><option>banner</option><option>mockup</option></select>
+            <input name="tema" placeholder="Tema">
+            <button>Gerar prompt de mídia</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    <table><tr><th>ID</th><th>Tipo</th><th>Tema</th><th>Prompt</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/whatsapp", methods=["GET", "POST"])
+def whatsapp_page():
+    if not login_required():
+        return redirect("/login")
+
+    msg = ""
+
+    if request.method == "POST":
+        msg = enviar_whatsapp_fila(request.form.get("cliente", ""), request.form.get("telefone", ""), request.form.get("mensagem", ""))
+
+    dados = listar("whatsapp_queue", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in dados])
+
+    return layout(f"""
+    <h1>💬 WhatsApp IA Queue</h1>
+    <div class="card">
+        <p>{msg}</p>
+        <form method="POST">
+            <input name="cliente" placeholder="Cliente">
+            <input name="telefone" placeholder="Telefone">
+            <textarea name="mensagem" placeholder="Mensagem"></textarea>
+            <button>Adicionar à fila</button>
+        </form>
+    </div>
+    <table><tr><th>ID</th><th>Cliente</th><th>Telefone</th><th>Mensagem</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/ceo")
+def ceo_page():
+    if not login_required():
+        return redirect("/login")
+    return layout(f"<h1>👑 CEO Omni Mode</h1><div class='card'><pre>{decisao_ceo_omni()}</pre></div>")
+
+
+async def omni_cmd(update, context):
+    await send(update, omni_responder(" ".join(context.args) or "Analise tudo e me diga o que fazer agora."))
+
+
+async def analytics_cmd(update, context):
+    await send(update, analytics_omni())
+
+
+async def ceo_cmd(update, context):
+    await send(update, decisao_ceo_omni())
 
 iniciar_banco()
 
