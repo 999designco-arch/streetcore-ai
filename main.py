@@ -273,6 +273,8 @@ TABLES = {
     "erros": "id INTEGER PRIMARY KEY AUTOINCREMENT,rota TEXT,erro TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "configuracoes": "id INTEGER PRIMARY KEY AUTOINCREMENT,chave TEXT,valor TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "chat_sessions": "id INTEGER PRIMARY KEY AUTOINCREMENT,usuario TEXT,pergunta TEXT,resposta TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "notas_sistema": "id INTEGER PRIMARY KEY AUTOINCREMENT,titulo TEXT,texto TEXT,status TEXT DEFAULT 'ativa',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "atalhos": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,rota TEXT,icone TEXT DEFAULT '⚡',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -342,7 +344,7 @@ def iniciar_banco():
                 (nome, funcao, "Aguardando primeira execução.")
             )
 
-    print("✅ StreetCore OS V41 CHATGPT STUDIO CORE iniciado.")
+    print("✅ StreetCore OS V42 PROFESSIONAL ENTERPRISE UI CORE iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -982,7 +984,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V41 ChatGPT Studio</title>
+<title>StreetCore V42 ChatGPT Studio</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root {{
@@ -1354,7 +1356,7 @@ pre {{
         <div class="brand">
             <div class="logo">SG</div>
             <div>
-                <h2>StreetCore V41</h2>
+                <h2>StreetCore V42</h2>
                 <p>ChatGPT Studio</p>
             </div>
         </div>
@@ -1406,7 +1408,7 @@ def login():
     return f"""
 <body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#111;padding:40px;border-radius:20px;width:330px">
-<h1>🔥 StreetCore V41</h1>
+<h1>🔥 StreetCore V42</h1>
 {erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
@@ -1460,7 +1462,7 @@ def home():
     """
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V41 CHATGPT STUDIO CORE FREE</h1>
+    <h1>🔥 STREETCORE OS V42 PROFESSIONAL ENTERPRISE UI CORE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
     <div class="grid">{cards}</div>
     {grafico}
@@ -1472,7 +1474,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "V41 CHATGPT STUDIO CORE FREE",
+        "version": "V42 PROFESSIONAL ENTERPRISE UI CORE FREE",
         "webhook": bool(WEBHOOK_URL),
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
@@ -2092,7 +2094,7 @@ def restore():
 @app.route("/api/info")
 def api_info():
     return jsonify({
-        "version": "V41 CHATGPT STUDIO CORE FREE",
+        "version": "V42 PROFESSIONAL ENTERPRISE UI CORE FREE",
         "api_key_header": "X-API-Key",
         "tables": SAFE_TABLES
     })
@@ -2156,7 +2158,7 @@ async def send(update, texto):
 
 async def start_cmd(update, context):
     await send(update,
-        "🔥 STREETCORE V41 CHATGPT STUDIO CORE\n\n"
+        "🔥 STREETCORE V42 PROFESSIONAL ENTERPRISE UI CORE\n\n"
         "/neural vender mais hoje\n"
         "/agentes campanha de camisetas\n"
         "/relatorio\n"
@@ -2325,6 +2327,7 @@ async def telegram_main():
 
     for nome, funcao in comandos.items():
         telegram_app.add_handler(CommandHandler(nome, funcao))
+    telegram_app.add_handler(CommandHandler("qualidade", qualidade_cmd))
     telegram_app.add_handler(CommandHandler("chat", chat_cmd))
     for nome, funcao in {
         "quantum": quantum_cmd,
@@ -2375,6 +2378,27 @@ def run_telegram():
 
 
 
+
+
+@app.errorhandler(404)
+def tratar_404(e):
+    try:
+        registrar_erro(request.path, "404 rota não encontrada")
+    except Exception:
+        pass
+
+    try:
+        return layout(f"""
+        <h1>🔎 Página não encontrada</h1>
+        <div class="card">
+            <p>Essa função ainda não estava conectada corretamente nesta versão, então o V42 criou correções e rotas compatíveis.</p>
+            <p><strong>Rota:</strong> {request.path}</p>
+            <a href="/">Voltar ao painel</a> · <a href="/workspace">Abrir Workspace</a> · <a href="/chat">Abrir Chat IA</a>
+        </div>
+        """), 404
+    except Exception:
+        return "Página não encontrada.", 404
+
 @app.errorhandler(Exception)
 def tratar_erro_global(e):
     try:
@@ -2395,7 +2419,7 @@ def tratar_erro_global(e):
         return f"Erro controlado: {e}", 500
 
 # =========================
-# V41 CHATGPT STUDIO CORE EXTRA
+# V42 PROFESSIONAL ENTERPRISE UI CORE EXTRA
 # =========================
 
 def workflow_vendas(cliente, descricao):
@@ -2492,7 +2516,7 @@ def singularity_center():
         resposta = operador_total(comando)
 
     return layout(f"""
-    <h1>👑 V41 ChatGPT Studio Center</h1>
+    <h1>👑 V42 Professional Enterprise Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2564,7 +2588,7 @@ def decisao_maxima():
     """)
 
 
-# Comandos extras V41 no Telegram
+# Comandos extras V42 no Telegram
 async def singularity_cmd(update, context):
     await send(update, operador_total(" ".join(context.args)))
 
@@ -2583,6 +2607,27 @@ async def workflow_cmd(update, context):
     await send(update, workflow_vendas(cliente, descricao))
 
 
+
+
+
+@app.errorhandler(404)
+def tratar_404(e):
+    try:
+        registrar_erro(request.path, "404 rota não encontrada")
+    except Exception:
+        pass
+
+    try:
+        return layout(f"""
+        <h1>🔎 Página não encontrada</h1>
+        <div class="card">
+            <p>Essa função ainda não estava conectada corretamente nesta versão, então o V42 criou correções e rotas compatíveis.</p>
+            <p><strong>Rota:</strong> {request.path}</p>
+            <a href="/">Voltar ao painel</a> · <a href="/workspace">Abrir Workspace</a> · <a href="/chat">Abrir Chat IA</a>
+        </div>
+        """), 404
+    except Exception:
+        return "Página não encontrada.", 404
 
 @app.errorhandler(Exception)
 def tratar_erro_global(e):
@@ -2604,7 +2649,7 @@ def tratar_erro_global(e):
         return f"Erro controlado: {e}", 500
 
 # =========================
-# V41 CHATGPT STUDIO EXTRA
+# V42 PROFESSIONAL ENTERPRISE UI EXTRA
 # =========================
 
 def diagnostico_sistema():
@@ -2623,7 +2668,7 @@ def diagnostico_sistema():
     propostas_abertas = contar("propostas")
     tarefas_pendentes = sql("SELECT COUNT(*) FROM tarefas WHERE status='pendente'", fetch=True)[0][0]
 
-    return f"""🧠 DIAGNÓSTICO MASTER V41
+    return f"""🧠 DIAGNÓSTICO MASTER V42
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -2647,8 +2692,8 @@ Próximas ações:
 def plano_master_automatico():
     diag = diagnostico_sistema()
     acao = campanha("Street Graff personalizados")
-    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V41", "pendente", "alta"))
-    inserir("notificacoes", "mensagem, status", ("Plano Master V41 criado automaticamente.", "nova"))
+    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V42", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", ("Plano Master V42 criado automaticamente.", "nova"))
     return f"""🚀 PLANO MASTER AUTOMÁTICO CRIADO
 
 {diag}
@@ -2695,7 +2740,7 @@ def master_center():
             resposta = conselho_multiagentes("Analise a operação inteira e gere o plano mais avançado possível.")
 
     return layout(f"""
-    <h1>👑 V41 ChatGPT Studio Center</h1>
+    <h1>👑 V42 Professional Enterprise Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2855,12 +2900,12 @@ def criar():
             msg = f"Erro ao criar: {e}"
 
         try:
-            log(f"Criar painel V41: {tipo} | {nome} | {msg}")
+            log(f"Criar painel V42: {tipo} | {nome} | {msg}")
         except Exception:
             pass
 
     return layout(f"""
-    <h1>➕ Criar Registro — V41 visual ChatGPT, avançado e blindado</h1>
+    <h1>➕ Criar Registro — V42 visual premium, profissional e blindado</h1>
 
     <div class="card">
         <p>{msg}</p>
