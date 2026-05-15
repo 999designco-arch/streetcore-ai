@@ -8,11 +8,11 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v26-free")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v27-free")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 
-DB_PATH = "streetcore_v26.db"
+DB_PATH = "streetcore_v27.db"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -29,16 +29,17 @@ def iniciar_banco():
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("""
+    tabelas = [
+        """
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
+            cliente TEXT,
             status TEXT DEFAULT 'novo',
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
@@ -46,9 +47,17 @@ def iniciar_banco():
             status TEXT DEFAULT 'novo',
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT,
+            contato TEXT,
+            historico TEXT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS financeiro (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tipo TEXT,
@@ -56,17 +65,15 @@ def iniciar_banco():
             descricao TEXT,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mensagem TEXT,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS conteudos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tema TEXT,
@@ -74,9 +81,8 @@ def iniciar_banco():
             texto TEXT,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS metas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
@@ -84,9 +90,8 @@ def iniciar_banco():
             status TEXT DEFAULT 'ativa',
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS agenda (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             titulo TEXT,
@@ -94,9 +99,8 @@ def iniciar_banco():
             status TEXT DEFAULT 'pendente',
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-
-    cur.execute("""
+        """,
+        """
         CREATE TABLE IF NOT EXISTS orcamentos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             descricao TEXT,
@@ -104,11 +108,32 @@ def iniciar_banco():
             status TEXT DEFAULT 'aberto',
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS campanhas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tema TEXT,
+            texto TEXT,
+            status TEXT DEFAULT 'planejada',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS tarefas_auto (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarefa TEXT,
+            status TEXT DEFAULT 'pendente',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    ]
+
+    for tabela in tabelas:
+        cur.execute(tabela)
 
     conn.commit()
     conn.close()
-    print("✅ Banco V26 iniciado.")
+    print("✅ Banco V27 iniciado.")
 
 
 def login_required():
@@ -155,50 +180,6 @@ def financeiro():
     return receita, despesa, receita - despesa
 
 
-def contar_status_leads(status):
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM leads WHERE status=?", (status,))
-    total = cur.fetchone()[0]
-    conn.close()
-    return total
-
-
-def listar_leads_status(status):
-    conn = db()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, nome, origem, status, criado_em FROM leads WHERE status=? ORDER BY id DESC LIMIT 50",
-        (status,)
-    )
-    dados = cur.fetchall()
-    conn.close()
-    return dados
-
-
-def calcular_orcamento(descricao):
-    texto = descricao.lower()
-    base = 35
-
-    if "caneca" in texto:
-        base = 30
-    elif "adesivo" in texto:
-        base = 8
-    elif "panfleto" in texto:
-        base = 80
-    elif "brinde" in texto:
-        base = 20
-
-    quantidade = 1
-
-    for palavra in texto.split():
-        if palavra.isdigit():
-            quantidade = int(palavra)
-            break
-
-    return base * quantidade
-
-
 def gerar_post(tema):
     return (
         f"🔥 POST PRONTO - {tema.upper()}\n\n"
@@ -230,18 +211,74 @@ def gerar_reels(tema):
     )
 
 
-def gerar_campanha(tema):
-    return f"{gerar_post(tema)}\n\n---\n\n{gerar_story(tema)}\n\n---\n\n{gerar_reels(tema)}"
+def gerar_campanha_texto(tema):
+    return (
+        f"🚀 CAMPANHA COMPLETA - {tema.upper()}\n\n"
+        f"{gerar_post(tema)}\n\n---\n\n"
+        f"{gerar_story(tema)}\n\n---\n\n"
+        f"{gerar_reels(tema)}"
+    )
+
+
+def calcular_orcamento(descricao):
+    texto = descricao.lower()
+
+    base = 35
+
+    if "caneca" in texto:
+        base = 30
+    elif "adesivo" in texto:
+        base = 8
+    elif "panfleto" in texto:
+        base = 80
+    elif "brinde" in texto:
+        base = 20
+    elif "camiseta" in texto:
+        base = 45
+
+    quantidade = 1
+
+    for palavra in texto.replace(",", " ").split():
+        if palavra.isdigit():
+            quantidade = int(palavra)
+            break
+
+    subtotal = base * quantidade
+
+    taxa_arte = 20 if "arte" in texto or "design" in texto else 0
+    urgencia = 30 if "urgente" in texto else 0
+
+    total = subtotal + taxa_arte + urgencia
+
+    return total
+
+
+def checklist_diario():
+    return (
+        "✅ CHECKLIST DIÁRIO STREETCORE\n\n"
+        "1. Ver novos leads\n"
+        "2. Atualizar status dos pedidos\n"
+        "3. Conferir financeiro\n"
+        "4. Criar 1 post\n"
+        "5. Criar 1 reels\n"
+        "6. Responder clientes\n"
+        "7. Revisar agenda\n"
+        "8. Fazer backup\n"
+        "9. Criar campanha do dia\n"
+        "10. Fechar pelo menos 1 venda"
+    )
 
 
 def relatorio_operacional():
     receita, despesa, lucro = financeiro()
 
     return (
-        "📊 RELATÓRIO OPERACIONAL V26\n\n"
+        "📊 RELATÓRIO OPERACIONAL V27\n\n"
         f"Pedidos: {contar('pedidos')}\n"
         f"Leads: {contar('leads')}\n"
+        f"Clientes: {contar('clientes')}\n"
         f"Conteúdos: {contar('conteudos')}\n"
+        f"Campanhas: {contar('campanhas')}\n"
         f"Metas: {contar('metas')}\n"
         f"Agenda: {contar('agenda')}\n"
         f"Orçamentos: {contar('orcamentos')}\n\n"
@@ -249,11 +286,25 @@ def relatorio_operacional():
         f"Despesa: R$ {despesa:.2f}\n"
         f"Lucro: R$ {lucro:.2f}\n\n"
         "Decisão sugerida:\n"
-        "✅ gerar mais leads\n"
-        "✅ publicar reels\n"
-        "✅ atualizar status dos pedidos\n"
-        "✅ revisar orçamento aberto\n"
-        "✅ acompanhar lucro"
+        "✅ gerar campanha\n"
+        "✅ captar leads\n"
+        "✅ atualizar pedidos\n"
+        "✅ fazer reels\n"
+        "✅ revisar orçamentos abertos"
+    )
+
+
+def copiloto(pergunta):
+    return (
+        "🤖 COPILOTO OPERACIONAL V27\n\n"
+        f"Pedido recebido: {pergunta}\n\n"
+        "Minha decisão operacional:\n"
+        "1. Criar campanha se precisar vender\n"
+        "2. Criar lead se for cliente novo\n"
+        "3. Criar pedido se já houve compra\n"
+        "4. Registrar receita se houve pagamento\n"
+        "5. Atualizar status se estiver em produção\n\n"
+        f"{checklist_diario()}"
     )
 
 
@@ -261,7 +312,7 @@ def layout(conteudo):
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V26</title>
+        <title>StreetCore OS V27</title>
         <style>
             body {{
                 margin:0;
@@ -274,7 +325,7 @@ def layout(conteudo):
                 top:0;
                 left:0;
                 bottom:0;
-                width:250px;
+                width:260px;
                 background:#0b0b0b;
                 border-right:1px solid #222;
                 padding:24px;
@@ -289,7 +340,7 @@ def layout(conteudo):
             }}
             .sidebar a:hover {{ color:#00ff88; }}
             .main {{
-                margin-left:300px;
+                margin-left:310px;
                 padding:30px;
             }}
             .grid {{
@@ -297,24 +348,12 @@ def layout(conteudo):
                 grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
                 gap:18px;
             }}
-            .kanban {{
-                display:grid;
-                grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-                gap:15px;
-            }}
             .card {{
                 background:#111;
                 border:1px solid #333;
                 border-radius:18px;
                 padding:22px;
                 margin-bottom:18px;
-            }}
-            .lead-card {{
-                background:#171717;
-                border:1px solid #333;
-                border-radius:14px;
-                padding:14px;
-                margin-bottom:12px;
             }}
             .big {{
                 color:#00ff88;
@@ -365,19 +404,19 @@ def layout(conteudo):
         <div class="sidebar">
             <h2>🔥 StreetCore</h2>
             <a href="/">Dashboard</a>
-            <a href="/kanban">Kanban CRM</a>
+            <a href="/copiloto">Copiloto</a>
+            <a href="/hoje">O que fazer hoje</a>
+            <a href="/campanhas">Campanhas</a>
+            <a href="/clientes">Clientes</a>
             <a href="/pedidos">Pedidos</a>
             <a href="/leads">Leads</a>
             <a href="/financeiro-web">Financeiro</a>
             <a href="/conteudo">Gerador IA</a>
-            <a href="/conteudos">Conteúdos</a>
             <a href="/metas">Metas</a>
             <a href="/agenda">Agenda</a>
             <a href="/orcamentos">Orçamentos</a>
             <a href="/decisao">Painel de Decisão</a>
             <a href="/criar">Criar</a>
-            <a href="/buscar">Buscar</a>
-            <a href="/backup">Backup</a>
             <a href="/logs">Logs</a>
             <a href="/logout">Sair</a>
         </div>
@@ -397,23 +436,26 @@ def home():
 
     receita, despesa, lucro = financeiro()
 
-    conteudo = f"""
-    <h1>🔥 STREETCORE OS V26 ULTRA PANEL</h1>
-    <p class="ok">Painel avançado com Kanban, metas, agenda, orçamentos e decisão.</p>
+    return layout(f"""
+    <h1>🔥 STREETCORE OS V27 MAX AUTOPILOT</h1>
+    <p class="ok">Painel com copiloto, campanhas, clientes e checklist diário.</p>
 
     <div class="grid">
         <div class="card"><h2>Pedidos</h2><div class="big">{contar("pedidos")}</div></div>
         <div class="card"><h2>Leads</h2><div class="big">{contar("leads")}</div></div>
-        <div class="card"><h2>Conteúdos</h2><div class="big">{contar("conteudos")}</div></div>
-        <div class="card"><h2>Metas</h2><div class="big">{contar("metas")}</div></div>
-        <div class="card"><h2>Agenda</h2><div class="big">{contar("agenda")}</div></div>
+        <div class="card"><h2>Clientes</h2><div class="big">{contar("clientes")}</div></div>
+        <div class="card"><h2>Campanhas</h2><div class="big">{contar("campanhas")}</div></div>
         <div class="card"><h2>Orçamentos</h2><div class="big">{contar("orcamentos")}</div></div>
         <div class="card"><h2>Receita</h2><div class="big">R$ {receita:.2f}</div></div>
+        <div class="card"><h2>Despesa</h2><div class="big">R$ {despesa:.2f}</div></div>
         <div class="card"><h2>Lucro</h2><div class="big">R$ {lucro:.2f}</div></div>
     </div>
-    """
 
-    return layout(conteudo)
+    <div class="card">
+        <h2>Autopilot</h2>
+        <pre>{checklist_diario()}</pre>
+    </div>
+    """)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -435,7 +477,7 @@ def login():
     <body style="background:#050505;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;">
         <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:330px;">
             <h1>🔥 StreetCore</h1>
-            <p>V26 Ultra Panel</p>
+            <p>V27 Max Autopilot</p>
             {erro}
             <form method="POST">
                 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
@@ -458,48 +500,146 @@ def logout():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "online", "version": "StreetCore OS V26 Ultra Panel"})
+    return jsonify({"status": "online", "version": "StreetCore OS V27 Max Autopilot"})
 
 
-@app.route("/kanban")
-def kanban():
+@app.route("/copiloto", methods=["GET", "POST"])
+def copiloto_page():
     if not login_required():
         return redirect("/login")
 
-    status_list = ["novo", "contatado", "orcamento", "convertido"]
+    resposta = ""
 
-    colunas = ""
-
-    for status in status_list:
-        leads = listar_leads_status(status)
-
-        cards = "".join([
-            f"""
-            <div class="lead-card">
-                <strong>#{l[0]} - {l[1]}</strong>
-                <p>Origem: {l[2]}</p>
-                <p>Status: {l[3]}</p>
-                <a href="/lead-status/{l[0]}/novo">Novo</a> |
-                <a href="/lead-status/{l[0]}/contatado">Contatado</a> |
-                <a href="/lead-status/{l[0]}/orcamento">Orçamento</a> |
-                <a href="/lead-status/{l[0]}/convertido">Convertido</a>
-            </div>
-            """
-            for l in leads
-        ])
-
-        colunas += f"""
-        <div class="card">
-            <h2>{status.upper()}</h2>
-            {cards}
-        </div>
-        """
+    if request.method == "POST":
+        pergunta = request.form.get("pergunta") or ""
+        resposta = copiloto(pergunta)
 
     return layout(f"""
-    <h1>🧩 Kanban CRM</h1>
-    <div class="kanban">
-        {colunas}
+    <h1>🤖 Copiloto Operacional</h1>
+    <div class="card">
+        <form method="POST">
+            <label>O que você quer decidir?</label>
+            <input name="pergunta" placeholder="Ex: como vender mais hoje?">
+            <button>Analisar</button>
+        </form>
     </div>
+    <div class="card">
+        <pre>{resposta}</pre>
+    </div>
+    """)
+
+
+@app.route("/hoje")
+def hoje_page():
+    if not login_required():
+        return redirect("/login")
+
+    return layout(f"""
+    <h1>✅ O que fazer hoje</h1>
+    <div class="card">
+        <pre>{checklist_diario()}</pre>
+    </div>
+    <div class="card">
+        <h2>Relatório rápido</h2>
+        <pre>{relatorio_operacional()}</pre>
+    </div>
+    """)
+
+
+@app.route("/campanhas", methods=["GET", "POST"])
+def campanhas_page():
+    if not login_required():
+        return redirect("/login")
+
+    mensagem = ""
+
+    if request.method == "POST":
+        tema = request.form.get("tema") or "Street Graff"
+        texto = gerar_campanha_texto(tema)
+
+        conn = db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO campanhas (tema, texto) VALUES (?, ?)",
+            (tema, texto)
+        )
+        conn.commit()
+        conn.close()
+
+        mensagem = "Campanha criada."
+
+    dados = listar("campanhas")
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td><pre>{d[2]}</pre></td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    return layout(f"""
+    <h1>🚀 Central de Campanhas</h1>
+
+    <div class="card">
+        <p class="ok">{mensagem}</p>
+        <form method="POST">
+            <input name="tema" placeholder="Tema da campanha">
+            <button>Criar campanha</button>
+        </form>
+    </div>
+
+    <table>
+        <tr><th>ID</th><th>Tema</th><th>Texto</th><th>Status</th><th>Data</th></tr>
+        {linhas}
+    </table>
+    """)
+
+
+@app.route("/clientes", methods=["GET", "POST"])
+def clientes_page():
+    if not login_required():
+        return redirect("/login")
+
+    mensagem = ""
+
+    if request.method == "POST":
+        nome = request.form.get("nome")
+        contato = request.form.get("contato")
+        historico = request.form.get("historico")
+
+        conn = db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO clientes (nome, contato, historico) VALUES (?, ?, ?)",
+            (nome, contato, historico)
+        )
+        conn.commit()
+        conn.close()
+
+        mensagem = "Cliente criado."
+
+    dados = listar("clientes")
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    return layout(f"""
+    <h1>👤 Clientes</h1>
+
+    <div class="card">
+        <p class="ok">{mensagem}</p>
+        <form method="POST">
+            <input name="nome" placeholder="Nome">
+            <input name="contato" placeholder="Contato">
+            <textarea name="historico" placeholder="Histórico do cliente"></textarea>
+            <button>Criar cliente</button>
+        </form>
+    </div>
+
+    <table>
+        <tr><th>ID</th><th>Nome</th><th>Contato</th><th>Histórico</th><th>Data</th></tr>
+        {linhas}
+    </table>
     """)
 
 
@@ -521,7 +661,7 @@ def conteudo_web():
         elif tipo == "reels":
             resultado = gerar_reels(tema)
         else:
-            resultado = gerar_campanha(tema)
+            resultado = gerar_campanha_texto(tema)
 
         conn = db()
         cur = conn.cursor()
@@ -559,27 +699,6 @@ def conteudo_web():
     """)
 
 
-@app.route("/conteudos")
-def conteudos_page():
-    if not login_required():
-        return redirect("/login")
-
-    dados = listar("conteudos")
-
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>🧠 Conteúdos salvos</h1>
-    <table>
-        <tr><th>ID</th><th>Tema</th><th>Tipo</th><th>Texto</th><th>Data</th></tr>
-        {linhas}
-    </table>
-    """)
-
-
 @app.route("/criar", methods=["GET", "POST"])
 def criar_web():
     if not login_required():
@@ -611,14 +730,6 @@ def criar_web():
             cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", float(valor), nome))
             mensagem = "Despesa adicionada."
 
-        elif tipo == "meta":
-            cur.execute("INSERT INTO metas (nome, valor) VALUES (?, ?)", (nome, valor))
-            mensagem = "Meta criada."
-
-        elif tipo == "agenda":
-            cur.execute("INSERT INTO agenda (titulo, data) VALUES (?, ?)", (nome, valor))
-            mensagem = "Evento criado."
-
         elif tipo == "orcamento":
             valor_calc = calcular_orcamento(nome)
             cur.execute("INSERT INTO orcamentos (descricao, valor) VALUES (?, ?)", (nome, valor_calc))
@@ -639,16 +750,14 @@ def criar_web():
                 <option value="lead">Lead</option>
                 <option value="receita">Receita</option>
                 <option value="despesa">Despesa</option>
-                <option value="meta">Meta</option>
-                <option value="agenda">Agenda</option>
                 <option value="orcamento">Orçamento</option>
             </select>
 
             <label>Nome/Descrição</label>
             <input name="nome" placeholder="Ex: camiseta personalizada">
 
-            <label>Valor/Data</label>
-            <input name="valor" placeholder="Ex: 100 ou 20/05 14h">
+            <label>Valor, se for financeiro</label>
+            <input name="valor" placeholder="Ex: 100">
 
             <button>Criar</button>
         </form>
@@ -664,43 +773,17 @@ def pedidos_page():
     dados = listar("pedidos")
 
     linhas = "".join([
-        f"""
-        <tr>
-            <td>{d[0]}</td>
-            <td>{d[1]}</td>
-            <td><span class="tag">{d[2]}</span></td>
-            <td>{d[3]}</td>
-            <td>
-                <a href="/pedido-status/{d[0]}/em_producao">Produção</a> |
-                <a href="/pedido-status/{d[0]}/finalizado">Finalizar</a>
-            </td>
-        </tr>
-        """
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><span class='tag'>{d[3]}</span></td><td>{d[4]}</td></tr>"
         for d in dados
     ])
 
     return layout(f"""
     <h1>📦 Pedidos</h1>
-    <a href="/export/pedidos">Exportar CSV</a><br><br>
     <table>
-        <tr><th>ID</th><th>Pedido</th><th>Status</th><th>Data</th><th>Ações</th></tr>
+        <tr><th>ID</th><th>Pedido</th><th>Cliente</th><th>Status</th><th>Data</th></tr>
         {linhas}
     </table>
     """)
-
-
-@app.route("/pedido-status/<int:pedido_id>/<status>")
-def pedido_status(pedido_id, status):
-    if not login_required():
-        return redirect("/login")
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("UPDATE pedidos SET status=? WHERE id=?", (status, pedido_id))
-    conn.commit()
-    conn.close()
-
-    return redirect("/pedidos")
 
 
 @app.route("/leads")
@@ -711,45 +794,17 @@ def leads_page():
     dados = listar("leads")
 
     linhas = "".join([
-        f"""
-        <tr>
-            <td>{d[0]}</td>
-            <td>{d[1]}</td>
-            <td>{d[2]}</td>
-            <td><span class="tag">{d[3]}</span></td>
-            <td>{d[4]}</td>
-            <td>
-                <a href="/lead-status/{d[0]}/contatado">Contatado</a> |
-                <a href="/lead-status/{d[0]}/orcamento">Orçamento</a> |
-                <a href="/lead-status/{d[0]}/convertido">Convertido</a>
-            </td>
-        </tr>
-        """
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
         for d in dados
     ])
 
     return layout(f"""
     <h1>🎯 Leads</h1>
-    <a href="/export/leads">Exportar CSV</a><br><br>
     <table>
-        <tr><th>ID</th><th>Nome</th><th>Origem</th><th>Status</th><th>Data</th><th>Ações</th></tr>
+        <tr><th>ID</th><th>Nome</th><th>Origem</th><th>Status</th><th>Data</th></tr>
         {linhas}
     </table>
     """)
-
-
-@app.route("/lead-status/<int:lead_id>/<status>")
-def lead_status(lead_id, status):
-    if not login_required():
-        return redirect("/login")
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("UPDATE leads SET status=? WHERE id=?", (status, lead_id))
-    conn.commit()
-    conn.close()
-
-    return redirect("/kanban")
 
 
 @app.route("/financeiro-web")
@@ -774,20 +829,7 @@ def metas_page():
     if not login_required():
         return redirect("/login")
 
-    dados = listar("metas")
-
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>🎯 Metas</h1>
-    <table>
-        <tr><th>ID</th><th>Meta</th><th>Valor</th><th>Status</th><th>Data</th></tr>
-        {linhas}
-    </table>
-    """)
+    return layout(f"<h1>🎯 Metas</h1><pre>{listar('metas')}</pre>")
 
 
 @app.route("/agenda")
@@ -795,20 +837,7 @@ def agenda_page():
     if not login_required():
         return redirect("/login")
 
-    dados = listar("agenda")
-
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>📅 Agenda</h1>
-    <table>
-        <tr><th>ID</th><th>Título</th><th>Data</th><th>Status</th><th>Criado</th></tr>
-        {linhas}
-    </table>
-    """)
+    return layout(f"<h1>📅 Agenda</h1><pre>{listar('agenda')}</pre>")
 
 
 @app.route("/orcamentos")
@@ -816,20 +845,7 @@ def orcamentos_page():
     if not login_required():
         return redirect("/login")
 
-    dados = listar("orcamentos")
-
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>R$ {d[2]:.2f}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>🧾 Orçamentos</h1>
-    <table>
-        <tr><th>ID</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Data</th></tr>
-        {linhas}
-    </table>
-    """)
+    return layout(f"<h1>🧾 Orçamentos</h1><pre>{listar('orcamentos')}</pre>")
 
 
 @app.route("/decisao")
@@ -837,92 +853,7 @@ def decisao_page():
     if not login_required():
         return redirect("/login")
 
-    relatorio = relatorio_operacional()
-
-    return layout(f"""
-    <h1>🧠 Painel de Decisão</h1>
-    <div class="card">
-        <pre>{relatorio}</pre>
-    </div>
-    """)
-
-
-@app.route("/buscar", methods=["GET", "POST"])
-def buscar_page():
-    if not login_required():
-        return redirect("/login")
-
-    resultado = ""
-
-    if request.method == "POST":
-        termo = request.form.get("termo")
-        termo_like = f"%{termo}%"
-
-        conn = db()
-        cur = conn.cursor()
-        cur.execute("SELECT id,nome,status,criado_em FROM pedidos WHERE nome LIKE ?", (termo_like,))
-        pedidos = cur.fetchall()
-
-        cur.execute("SELECT id,nome,origem,status,criado_em FROM leads WHERE nome LIKE ? OR origem LIKE ?", (termo_like, termo_like))
-        leads = cur.fetchall()
-        conn.close()
-
-        resultado = f"<h2>Pedidos</h2><pre>{pedidos}</pre><h2>Leads</h2><pre>{leads}</pre>"
-
-    return layout(f"""
-    <h1>🔎 Buscar</h1>
-    <div class="card">
-        <form method="POST">
-            <input name="termo" placeholder="Digite algo para buscar">
-            <button>Buscar</button>
-        </form>
-    </div>
-    <div class="card">{resultado}</div>
-    """)
-
-
-@app.route("/backup")
-def backup_page():
-    if not login_required():
-        return redirect("/login")
-
-    nome = f"backup_v26_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-
-    with open(DB_PATH, "rb") as origem:
-        conteudo = origem.read()
-
-    return Response(
-        conteudo,
-        mimetype="application/octet-stream",
-        headers={"Content-Disposition": f"attachment;filename={nome}"}
-    )
-
-
-@app.route("/export/<tabela>")
-def export_csv(tabela):
-    if not login_required():
-        return redirect("/login")
-
-    if tabela not in ["pedidos", "leads", "financeiro", "conteudos", "metas", "agenda", "orcamentos"]:
-        return "Tabela não permitida."
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute(f"SELECT * FROM {tabela}")
-    dados = cur.fetchall()
-    colunas = [desc[0] for desc in cur.description]
-    conn.close()
-
-    def gerar():
-        yield ",".join(colunas) + "\n"
-        for linha in dados:
-            yield ",".join([str(x).replace(",", " ") for x in linha]) + "\n"
-
-    return Response(
-        gerar(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={tabela}.csv"}
-    )
+    return layout(f"<h1>🧠 Painel de Decisão</h1><div class='card'><pre>{relatorio_operacional()}</pre></div>")
 
 
 @app.route("/logs")
@@ -930,82 +861,59 @@ def logs_page():
     if not login_required():
         return redirect("/login")
 
-    dados = listar("logs")
-    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td></tr>" for d in dados])
-
-    return layout(f"""
-    <h1>🧾 Logs</h1>
-    <table><tr><th>ID</th><th>Mensagem</th><th>Data</th></tr>{linhas}</table>
-    """)
+    return layout(f"<h1>🧾 Logs</h1><pre>{listar('logs')}</pre>")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V26 ULTRA PANEL\n\n"
+        "🔥 STREETCORE OS V27 MAX AUTOPILOT\n\n"
+        "/copiloto como vender mais hoje\n"
+        "/hoje\n"
+        "/relatorio\n"
+        "/campanha street graff\n"
         "/pedido camiseta personalizada\n"
-        "/pedidos\n"
-        "/pedido_status 1 finalizado\n"
         "/lead joao instagram\n"
-        "/leads\n"
-        "/lead_status 1 convertido\n"
+        "/cliente joao 119999 pedido camiseta\n"
+        "/orcamento 10 camisetas com arte\n"
         "/receita 100\n"
         "/despesa 50\n"
         "/financeiro\n"
-        "/meta vender_1000 1000\n"
-        "/metas\n"
-        "/agenda reunião 20/05\n"
-        "/agendas\n"
-        "/orcamento 10 camisetas\n"
-        "/orcamentos\n"
-        "/relatorio\n"
         "/post camisetas\n"
         "/story adesivos\n"
         "/reels canecas\n"
-        "/campanha street graff\n"
         "/status"
     )
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ StreetCore OS V26 online.")
+    await update.message.reply_text("✅ StreetCore OS V27 online.")
 
 
-async def pedido(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def copiloto_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(copiloto(" ".join(context.args)))
+
+
+async def hoje_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(checklist_diario())
+
+
+async def relatorio_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(relatorio_operacional())
+
+
+async def pedido_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nome = " ".join(context.args)
-    if not nome:
-        await update.message.reply_text("Use assim: /pedido camiseta personalizada")
-        return
-
     conn = db()
     cur = conn.cursor()
     cur.execute("INSERT INTO pedidos (nome) VALUES (?)", (nome,))
     conn.commit()
     conn.close()
-
     await update.message.reply_text(f"📦 Pedido criado: {nome}")
 
 
-async def pedidos_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(str(listar("pedidos")))
-
-
-async def pedido_status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) < 2:
-        await update.message.reply_text("Use assim: /pedido_status 1 finalizado")
-        return
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("UPDATE pedidos SET status=? WHERE id=?", (" ".join(context.args[1:]), context.args[0]))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text("✅ Pedido atualizado.")
-
-
-async def lead(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def lead_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Use assim: /lead joao instagram")
+        await update.message.reply_text("Use: /lead joao instagram")
         return
 
     nome = context.args[0]
@@ -1020,110 +928,29 @@ async def lead(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🎯 Lead criado: {nome}")
 
 
-async def leads_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(str(listar("leads")))
-
-
-async def lead_status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cliente_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
-        await update.message.reply_text("Use assim: /lead_status 1 convertido")
-        return
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("UPDATE leads SET status=? WHERE id=?", (" ".join(context.args[1:]), context.args[0]))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text("✅ Lead atualizado.")
-
-
-async def receita(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        valor = float(context.args[0].replace(",", "."))
-    except Exception:
-        await update.message.reply_text("Use assim: /receita 100")
-        return
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("receita", valor, "telegram"))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text(f"💰 Receita adicionada: R$ {valor:.2f}")
-
-
-async def despesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        valor = float(context.args[0].replace(",", "."))
-    except Exception:
-        await update.message.reply_text("Use assim: /despesa 50")
-        return
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", valor, "telegram"))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text(f"💸 Despesa adicionada: R$ {valor:.2f}")
-
-
-async def financeiro_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    r, d, l = financeiro()
-    await update.message.reply_text(f"💵 FINANCEIRO\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}")
-
-
-async def meta_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) < 2:
-        await update.message.reply_text("Use assim: /meta vender_1000 1000")
+        await update.message.reply_text("Use: /cliente nome contato historico")
         return
 
     nome = context.args[0]
-    valor = " ".join(context.args[1:])
+    contato = context.args[1]
+    historico = " ".join(context.args[2:])
 
     conn = db()
     cur = conn.cursor()
-    cur.execute("INSERT INTO metas (nome, valor) VALUES (?, ?)", (nome, valor))
+    cur.execute(
+        "INSERT INTO clientes (nome, contato, historico) VALUES (?, ?, ?)",
+        (nome, contato, historico)
+    )
     conn.commit()
     conn.close()
 
-    await update.message.reply_text("🎯 Meta criada.")
-
-
-async def metas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(str(listar("metas")))
-
-
-async def agenda_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) < 2:
-        await update.message.reply_text("Use assim: /agenda reunião 20/05")
-        return
-
-    titulo = context.args[0]
-    data = " ".join(context.args[1:])
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO agenda (titulo, data) VALUES (?, ?)", (titulo, data))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text("📅 Evento criado.")
-
-
-async def agendas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(str(listar("agenda")))
+    await update.message.reply_text(f"👤 Cliente criado: {nome}")
 
 
 async def orcamento_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     descricao = " ".join(context.args)
-
-    if not descricao:
-        await update.message.reply_text("Use assim: /orcamento 10 camisetas")
-        return
-
     valor = calcular_orcamento(descricao)
 
     conn = db()
@@ -1135,33 +962,59 @@ async def orcamento_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🧾 Orçamento criado: R$ {valor:.2f}")
 
 
-async def orcamentos_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(str(listar("orcamentos")))
+async def receita_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    valor = float(context.args[0].replace(",", "."))
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("receita", valor, "telegram"))
+    conn.commit()
+    conn.close()
+    await update.message.reply_text(f"💰 Receita: R$ {valor:.2f}")
 
 
-async def relatorio_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(relatorio_operacional())
+async def despesa_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    valor = float(context.args[0].replace(",", "."))
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", valor, "telegram"))
+    conn.commit()
+    conn.close()
+    await update.message.reply_text(f"💸 Despesa: R$ {valor:.2f}")
 
 
-async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def financeiro_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    r, d, l = financeiro()
+    await update.message.reply_text(f"💵 FINANCEIRO\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}")
+
+
+async def campanha_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    tema = " ".join(context.args) or "Street Graff"
+    texto = gerar_campanha_texto(tema)
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO campanhas (tema, texto) VALUES (?, ?)", (tema, texto))
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(texto)
+
+
+async def post_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_post(" ".join(context.args) or "Street Graff"))
 
 
-async def story(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def story_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_story(" ".join(context.args) or "Street Graff"))
 
 
-async def reels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reels_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_reels(" ".join(context.args) or "Street Graff"))
-
-
-async def campanha(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(gerar_campanha(" ".join(context.args) or "Street Graff"))
 
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     salvar_log(update.message.text)
-    await update.message.reply_text("🤖 StreetCore IA V26 recebeu. Use /start.")
+    await update.message.reply_text("🤖 StreetCore IA V27 recebeu. Use /start.")
 
 
 async def telegram_main():
@@ -1169,33 +1022,27 @@ async def telegram_main():
 
     bot.add_handler(CommandHandler("start", start))
     bot.add_handler(CommandHandler("status", status))
-    bot.add_handler(CommandHandler("pedido", pedido))
-    bot.add_handler(CommandHandler("pedidos", pedidos_cmd))
-    bot.add_handler(CommandHandler("pedido_status", pedido_status_cmd))
-    bot.add_handler(CommandHandler("lead", lead))
-    bot.add_handler(CommandHandler("leads", leads_cmd))
-    bot.add_handler(CommandHandler("lead_status", lead_status_cmd))
-    bot.add_handler(CommandHandler("receita", receita))
-    bot.add_handler(CommandHandler("despesa", despesa))
-    bot.add_handler(CommandHandler("financeiro", financeiro_cmd))
-    bot.add_handler(CommandHandler("meta", meta_cmd))
-    bot.add_handler(CommandHandler("metas", metas_cmd))
-    bot.add_handler(CommandHandler("agenda", agenda_cmd))
-    bot.add_handler(CommandHandler("agendas", agendas_cmd))
-    bot.add_handler(CommandHandler("orcamento", orcamento_cmd))
-    bot.add_handler(CommandHandler("orcamentos", orcamentos_cmd))
+    bot.add_handler(CommandHandler("copiloto", copiloto_cmd))
+    bot.add_handler(CommandHandler("hoje", hoje_cmd))
     bot.add_handler(CommandHandler("relatorio", relatorio_cmd))
-    bot.add_handler(CommandHandler("post", post))
-    bot.add_handler(CommandHandler("story", story))
-    bot.add_handler(CommandHandler("reels", reels))
-    bot.add_handler(CommandHandler("campanha", campanha))
+    bot.add_handler(CommandHandler("pedido", pedido_cmd))
+    bot.add_handler(CommandHandler("lead", lead_cmd))
+    bot.add_handler(CommandHandler("cliente", cliente_cmd))
+    bot.add_handler(CommandHandler("orcamento", orcamento_cmd))
+    bot.add_handler(CommandHandler("receita", receita_cmd))
+    bot.add_handler(CommandHandler("despesa", despesa_cmd))
+    bot.add_handler(CommandHandler("financeiro", financeiro_cmd))
+    bot.add_handler(CommandHandler("campanha", campanha_cmd))
+    bot.add_handler(CommandHandler("post", post_cmd))
+    bot.add_handler(CommandHandler("story", story_cmd))
+    bot.add_handler(CommandHandler("reels", reels_cmd))
     bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V26...")
+    print("🔥 Telegram iniciando V27...")
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V26")
+    print("✅ Telegram ONLINE V27")
 
     await asyncio.Event().wait()
 
