@@ -8,10 +8,10 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v29-free")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v30-supreme")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
-DB_PATH = "streetcore_v29.db"
+DB_PATH = "streetcore_v30.db"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -134,6 +134,33 @@ def iniciar_banco():
             pergunta TEXT,
             resposta TEXT,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS automacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT,
+            acao TEXT,
+            status TEXT DEFAULT 'ativa',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS ideias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tema TEXT,
+            ideia TEXT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS catalogo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            produto TEXT,
+            preco REAL,
+            descricao TEXT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS calendario_conteudo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dia TEXT,
+            conteudo TEXT,
+            status TEXT DEFAULT 'planejado',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )"""
     ]
 
@@ -142,7 +169,7 @@ def iniciar_banco():
 
     conn.commit()
     conn.close()
-    print("✅ Banco V29 AI OFFICE iniciado.")
+    print("✅ Banco V30 SUPREME iniciado.")
 
 
 def login_required():
@@ -157,13 +184,13 @@ def salvar_log(msg):
     conn.close()
 
 
-def contar(tabela):
+def inserir(tabela, campos, valores):
     conn = db()
     cur = conn.cursor()
-    cur.execute(f"SELECT COUNT(*) FROM {tabela}")
-    total = cur.fetchone()[0]
+    q = ",".join(["?"] * len(valores))
+    cur.execute(f"INSERT INTO {tabela} ({campos}) VALUES ({q})", valores)
+    conn.commit()
     conn.close()
-    return total
 
 
 def listar(tabela):
@@ -173,6 +200,15 @@ def listar(tabela):
     dados = cur.fetchall()
     conn.close()
     return dados
+
+
+def contar(tabela):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute(f"SELECT COUNT(*) FROM {tabela}")
+    total = cur.fetchone()[0]
+    conn.close()
+    return total
 
 
 def financeiro():
@@ -195,7 +231,7 @@ def gerar_post(tema):
         "Sua marca precisa aparecer com presença.\n"
         "A Street Graff cria camisetas, adesivos, canecas, panfletos e brindes personalizados.\n\n"
         "📲 Chama no direct e peça seu orçamento.\n\n"
-        "#streetgraff #personalizados #camisetaspersonalizadas #adesivospersonalizados"
+        "#streetgraff #personalizados #camisetaspersonalizadas #adesivospersonalizados #canecaspersonalizadas"
     )
 
 
@@ -221,7 +257,18 @@ def gerar_reels(tema):
 
 
 def gerar_campanha(tema):
-    return f"{gerar_post(tema)}\n\n---\n\n{gerar_story(tema)}\n\n---\n\n{gerar_reels(tema)}"
+    return (
+        f"🚀 CAMPANHA SUPREME - {tema.upper()}\n\n"
+        f"{gerar_post(tema)}\n\n---\n\n"
+        f"{gerar_story(tema)}\n\n---\n\n"
+        f"{gerar_reels(tema)}\n\n---\n\n"
+        "Plano de ação:\n"
+        "1. Postar feed hoje às 18h.\n"
+        "2. Subir stories em 3 partes.\n"
+        "3. Fazer reels com bastidor.\n"
+        "4. Chamar clientes no direct.\n"
+        "5. Registrar leads no sistema."
+    )
 
 
 def calcular_orcamento(descricao):
@@ -245,28 +292,28 @@ def calcular_orcamento(descricao):
             quantidade = int(palavra)
             break
 
-    adicional_arte = 20 if "arte" in texto or "design" in texto else 0
-    urgencia = 30 if "urgente" in texto else 0
+    arte = 20 if "arte" in texto or "design" in texto else 0
+    urgente = 30 if "urgente" in texto else 0
 
-    return (base * quantidade) + adicional_arte + urgencia
+    return (base * quantidade) + arte + urgente
 
 
 def gerar_proposta(cliente, descricao):
     valor = calcular_orcamento(descricao)
 
     return (
-        f"🧾 PROPOSTA COMERCIAL - STREET GRAFF\n\n"
+        f"🧾 PROPOSTA COMERCIAL STREET GRAFF\n\n"
         f"Cliente: {cliente}\n"
         f"Solicitação: {descricao}\n\n"
-        "Itens inclusos:\n"
+        "Incluso:\n"
         "- atendimento personalizado;\n"
         "- produção sob medida;\n"
-        "- personalização conforme pedido;\n"
-        "- revisão básica antes da produção.\n\n"
-        f"Valor estimado: R$ {valor:.2f}\n\n"
-        "Prazo estimado: 5 dias úteis + transporte.\n"
+        "- revisão básica;\n"
+        "- personalização conforme pedido.\n\n"
+        f"Valor estimado: R$ {valor:.2f}\n"
+        "Prazo: 5 dias úteis + transporte.\n"
         "Pagamento: somente via PIX.\n\n"
-        "Para confirmar o pedido, envie a arte/referência e confirme a quantidade."
+        "Para confirmar, envie arte/referência e quantidade final."
     )
 
 
@@ -276,13 +323,13 @@ def gerar_contrato(cliente, servico, valor):
         f"Contratante: {cliente}\n"
         "Contratada: Street Graff\n\n"
         f"Serviço: {servico}\n"
-        f"Valor combinado: R$ {valor}\n\n"
+        f"Valor: R$ {valor}\n\n"
         "Condições:\n"
-        "1. O pagamento será realizado via PIX.\n"
-        "2. O prazo de produção é de 5 dias úteis após confirmação.\n"
-        "3. Alterações após aprovação podem gerar custos adicionais.\n"
-        "4. A produção inicia após confirmação do pagamento e detalhes finais.\n\n"
-        "Este é um modelo simples gerado automaticamente."
+        "1. Pagamento via PIX.\n"
+        "2. Produção em até 5 dias úteis após confirmação.\n"
+        "3. Alterações após aprovação podem gerar custos extras.\n"
+        "4. Produção inicia após pagamento e confirmação dos detalhes.\n\n"
+        "Modelo simples gerado automaticamente."
     )
 
 
@@ -291,12 +338,12 @@ def faq_resposta(pergunta):
 
     if "prazo" in p:
         return "O prazo padrão é de 5 dias úteis de produção + tempo da transportadora."
-    if "pagamento" in p or "pix" in p:
+    if "pix" in p or "pagamento" in p:
         return "O pagamento é somente via PIX."
     if "camiseta" in p:
-        return "Fazemos camisetas personalizadas sob encomenda. O preço varia por quantidade e arte."
+        return "Fazemos camisetas personalizadas. O preço varia por quantidade, arte e detalhes."
     if "caneca" in p:
-        return "Fazemos canecas personalizadas. O valor depende da quantidade e personalização."
+        return "Fazemos canecas personalizadas. O valor depende da quantidade e da personalização."
     if "adesivo" in p:
         return "Fazemos adesivos personalizados em diferentes tamanhos e quantidades."
     if "panfleto" in p:
@@ -306,24 +353,12 @@ def faq_resposta(pergunta):
     if "orçamento" in p or "orcamento" in p:
         return "Para orçamento, informe produto, quantidade, tamanho e se já possui arte."
 
-    return (
-        "Posso ajudar com orçamento, prazo, pagamento, camisetas, adesivos, canecas, panfletos e brindes. "
-        "Envie produto + quantidade para uma resposta melhor."
-    )
+    return "Posso ajudar com orçamento, prazo, pagamento, camisetas, adesivos, canecas, panfletos e brindes."
 
 
 def atendimento_automatico(cliente, pergunta):
     resposta = faq_resposta(pergunta)
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO atendimentos (cliente, pergunta, resposta) VALUES (?, ?, ?)",
-        (cliente, pergunta, resposta)
-    )
-    conn.commit()
-    conn.close()
-
+    inserir("atendimentos", "cliente,pergunta,resposta", (cliente, pergunta, resposta))
     return resposta
 
 
@@ -331,87 +366,131 @@ def busca_sistema(termo):
     termo_like = f"%{termo}%"
     conn = db()
     cur = conn.cursor()
+    blocos = []
 
-    resultados = []
-
-    buscas = [
-        ("pedidos", "SELECT id,nome,cliente,status,criado_em FROM pedidos WHERE nome LIKE ? OR cliente LIKE ?"),
-        ("leads", "SELECT id,nome,origem,status,criado_em FROM leads WHERE nome LIKE ? OR origem LIKE ?"),
-        ("clientes", "SELECT id,nome,contato,historico,criado_em FROM clientes WHERE nome LIKE ? OR contato LIKE ? OR historico LIKE ?"),
-        ("documentos", "SELECT id,titulo,tipo,criado_em FROM documentos WHERE titulo LIKE ? OR texto LIKE ?"),
-        ("conhecimento", "SELECT id,titulo,criado_em FROM conhecimento WHERE titulo LIKE ? OR texto LIKE ?"),
+    pesquisas = [
+        ("PEDIDOS", "SELECT id,nome,cliente,status,criado_em FROM pedidos WHERE nome LIKE ? OR cliente LIKE ?"),
+        ("LEADS", "SELECT id,nome,origem,status,criado_em FROM leads WHERE nome LIKE ? OR origem LIKE ?"),
+        ("CLIENTES", "SELECT id,nome,contato,historico,criado_em FROM clientes WHERE nome LIKE ? OR contato LIKE ?"),
+        ("DOCUMENTOS", "SELECT id,titulo,tipo,criado_em FROM documentos WHERE titulo LIKE ? OR texto LIKE ?"),
+        ("CONHECIMENTO", "SELECT id,titulo,criado_em FROM conhecimento WHERE titulo LIKE ? OR texto LIKE ?"),
+        ("PROPOSTAS", "SELECT id,cliente,descricao,valor,criado_em FROM propostas WHERE cliente LIKE ? OR descricao LIKE ?")
     ]
 
-    for nome, query in buscas:
-        try:
-            if nome == "clientes":
-                cur.execute(query, (termo_like, termo_like, termo_like))
-            else:
-                cur.execute(query, (termo_like, termo_like))
-            dados = cur.fetchall()
-            if dados:
-                resultados.append(f"\n{nome.upper()}:\n" + "\n".join(map(str, dados)))
-        except Exception:
-            pass
+    for nome, query in pesquisas:
+        cur.execute(query, (termo_like, termo_like))
+        dados = cur.fetchall()
+        if dados:
+            blocos.append(f"{nome}:\n" + "\n".join(map(str, dados)))
 
     conn.close()
-
-    if not resultados:
-        return "Nenhum resultado encontrado."
-
-    return "\n".join(resultados)
+    return "\n\n".join(blocos) if blocos else "Nenhum resultado encontrado."
 
 
-def checklist():
+def plano_do_dia():
     return (
-        "✅ CHECKLIST AI OFFICE\n\n"
-        "1. Ver leads novos\n"
-        "2. Responder atendimentos\n"
-        "3. Criar propostas pendentes\n"
-        "4. Atualizar pedidos\n"
-        "5. Conferir produção\n"
-        "6. Registrar financeiro\n"
-        "7. Criar conteúdo do dia\n"
-        "8. Salvar conhecimento importante\n"
-        "9. Fazer backup\n"
-        "10. Fechar vendas"
+        "✅ PLANO DO DIA SUPREME\n\n"
+        "1. Verificar novos leads.\n"
+        "2. Responder clientes pendentes.\n"
+        "3. Criar 1 campanha com foco em venda.\n"
+        "4. Gerar 1 post, 1 story e 1 reels.\n"
+        "5. Conferir produção e estoque.\n"
+        "6. Atualizar pedidos.\n"
+        "7. Registrar receitas e despesas.\n"
+        "8. Criar propostas para leads quentes.\n"
+        "9. Fazer backup.\n"
+        "10. Fechar pelo menos 1 venda."
     )
 
 
 def relatorio():
     r, d, l = financeiro()
+
     return (
-        "📊 RELATÓRIO V29 AI OFFICE\n\n"
+        "📊 RELATÓRIO V30 SUPREME OS\n\n"
         f"Pedidos: {contar('pedidos')}\n"
         f"Leads: {contar('leads')}\n"
         f"Clientes: {contar('clientes')}\n"
+        f"Conteúdos: {contar('conteudos')}\n"
+        f"Campanhas: {contar('campanhas')}\n"
         f"Tarefas: {contar('tarefas')}\n"
+        f"Produção: {contar('producao')}\n"
+        f"Estoque: {contar('estoque')}\n"
         f"Documentos: {contar('documentos')}\n"
-        f"Conhecimentos: {contar('conhecimento')}\n"
+        f"Conhecimento: {contar('conhecimento')}\n"
         f"Propostas: {contar('propostas')}\n"
-        f"Atendimentos: {contar('atendimentos')}\n\n"
+        f"Atendimentos: {contar('atendimentos')}\n"
+        f"Automações: {contar('automacoes')}\n\n"
         f"Receita: R$ {r:.2f}\n"
         f"Despesa: R$ {d:.2f}\n"
         f"Lucro: R$ {l:.2f}\n\n"
-        "Decisão: priorizar propostas, atendimento rápido e fechamento de pedidos."
+        "Decisão suprema:\n"
+        "✅ priorizar leads quentes;\n"
+        "✅ criar campanha hoje;\n"
+        "✅ converter propostas abertas;\n"
+        "✅ controlar produção;\n"
+        "✅ manter conteúdo diário."
     )
+
+
+def copiloto(pergunta):
+    return (
+        "🧠 COPILOTO SUPREME\n\n"
+        f"Pedido recebido: {pergunta}\n\n"
+        "Plano recomendado:\n"
+        "1. Se for venda: criar campanha + proposta.\n"
+        "2. Se for cliente: registrar lead/cliente.\n"
+        "3. Se for pedido: criar pedido e produção.\n"
+        "4. Se for dinheiro: lançar receita/despesa.\n"
+        "5. Se for marketing: gerar post, story e reels.\n\n"
+        f"{plano_do_dia()}"
+    )
+
+
+def calendario_semanal(tema):
+    return (
+        f"📅 CALENDÁRIO SEMANAL - {tema.upper()}\n\n"
+        "Segunda: post de produto + story bastidor.\n"
+        "Terça: reels antes/depois.\n"
+        "Quarta: post de venda + enquete.\n"
+        "Quinta: bastidor da produção.\n"
+        "Sexta: prova social + oferta.\n"
+        "Sábado: campanha promocional.\n"
+        "Domingo: inspiração + bastidor leve."
+    )
+
+
+def gerar_ideias(tema):
+    ideias = [
+        f"Antes e depois de {tema}",
+        f"Bastidor produzindo {tema}",
+        f"Oferta relâmpago de {tema}",
+        f"Depoimento de cliente sobre {tema}",
+        f"Reels mostrando detalhes de {tema}",
+        f"Story com enquete sobre {tema}",
+        f"Post educativo sobre personalização de {tema}"
+    ]
+
+    texto = "\n".join([f"{i+1}. {ideia}" for i, ideia in enumerate(ideias)])
+    inserir("ideias", "tema,ideia", (tema, texto))
+    return f"💡 IDEIAS GERADAS\n\n{texto}"
 
 
 def layout(conteudo):
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V29</title>
+        <title>StreetCore OS V30</title>
         <style>
             body {{ margin:0; background:#050505; color:white; font-family:Arial; }}
             .sidebar {{
-                position:fixed; top:0; left:0; bottom:0; width:270px;
+                position:fixed; top:0; left:0; bottom:0; width:280px;
                 background:#0b0b0b; border-right:1px solid #222; padding:24px; overflow:auto;
             }}
             .sidebar h2 {{ color:#00ff88; }}
             .sidebar a {{ display:block; color:white; text-decoration:none; margin:12px 0; }}
             .sidebar a:hover {{ color:#00ff88; }}
-            .main {{ margin-left:320px; padding:30px; }}
+            .main {{ margin-left:330px; padding:30px; }}
             .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; }}
             .card {{ background:#111; border:1px solid #333; border-radius:18px; padding:22px; margin-bottom:18px; }}
             .big {{ color:#00ff88; font-size:36px; font-weight:bold; }}
@@ -427,7 +506,6 @@ def layout(conteudo):
             }}
             table {{ width:100%; border-collapse:collapse; background:#111; border-radius:14px; overflow:hidden; }}
             th, td {{ padding:12px; border-bottom:1px solid #333; text-align:left; vertical-align:top; }}
-            .tag {{ background:#1f1f1f; padding:6px 10px; border-radius:8px; }}
             a {{ color:#00ff88; }}
             pre {{ white-space:pre-wrap; }}
         </style>
@@ -435,23 +513,25 @@ def layout(conteudo):
     <body>
         <div class="sidebar">
             <h2>🔥 StreetCore</h2>
-            <a href="/">Dashboard</a>
+            <a href="/">Dashboard Supremo</a>
+            <a href="/supreme">Supreme Center</a>
+            <a href="/copiloto">Copiloto</a>
+            <a href="/hoje">Plano do Dia</a>
             <a href="/office">AI Office</a>
             <a href="/atendimento">Atendimento</a>
             <a href="/propostas">Propostas</a>
             <a href="/documentos">Documentos</a>
             <a href="/conhecimento">Conhecimento</a>
-            <a href="/buscar">Busca Geral</a>
-            <a href="/command">Command Center</a>
-            <a href="/tarefas">Tarefas</a>
-            <a href="/producao">Produção</a>
-            <a href="/estoque">Estoque</a>
-            <a href="/clientes">Clientes</a>
+            <a href="/campanhas">Campanhas</a>
+            <a href="/ideias">Ideias</a>
+            <a href="/calendario-conteudo">Calendário Conteúdo</a>
+            <a href="/catalogo">Catálogo</a>
             <a href="/pedidos">Pedidos</a>
             <a href="/leads">Leads</a>
+            <a href="/clientes">Clientes</a>
             <a href="/financeiro-web">Financeiro</a>
-            <a href="/conteudo">Gerador IA</a>
             <a href="/relatorio-web">Relatório</a>
+            <a href="/buscar">Busca Geral</a>
             <a href="/backup">Backup</a>
             <a href="/logs">Logs</a>
             <a href="/logout">Sair</a>
@@ -470,27 +550,29 @@ def home():
     r, d, l = financeiro()
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V29 AI OFFICE</h1>
-    <p class="ok">Centro de documentos, propostas, atendimento e conhecimento.</p>
+    <h1>🔥 STREETCORE OS V30 SUPREME</h1>
+    <p class="ok">Sistema supremo gratuito: vendas, operação, escritório IA, conteúdo e decisão.</p>
 
     <div class="grid">
         <div class="card"><h2>Pedidos</h2><div class="big">{contar("pedidos")}</div></div>
         <div class="card"><h2>Leads</h2><div class="big">{contar("leads")}</div></div>
         <div class="card"><h2>Clientes</h2><div class="big">{contar("clientes")}</div></div>
         <div class="card"><h2>Propostas</h2><div class="big">{contar("propostas")}</div></div>
-        <div class="card"><h2>Documentos</h2><div class="big">{contar("documentos")}</div></div>
+        <div class="card"><h2>Campanhas</h2><div class="big">{contar("campanhas")}</div></div>
+        <div class="card"><h2>Conteúdos</h2><div class="big">{contar("conteudos")}</div></div>
         <div class="card"><h2>Atendimentos</h2><div class="big">{contar("atendimentos")}</div></div>
         <div class="card"><h2>Receita</h2><div class="big">R$ {r:.2f}</div></div>
         <div class="card"><h2>Lucro</h2><div class="big">R$ {l:.2f}</div></div>
     </div>
 
-    <div class="card"><pre>{checklist()}</pre></div>
+    <div class="card"><pre>{plano_do_dia()}</pre></div>
     """)
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = ""
+
     if request.method == "POST":
         if request.form.get("usuario") == ADMIN_USER and request.form.get("senha") == ADMIN_PASS:
             session["logado"] = True
@@ -502,7 +584,7 @@ def login():
     <body style="background:#050505;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;">
         <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:330px;">
             <h1>🔥 StreetCore</h1>
-            <p>V29 AI Office</p>
+            <p>V30 Supreme OS</p>
             {erro}
             <form method="POST">
                 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
@@ -524,7 +606,59 @@ def logout():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "online", "version": "StreetCore OS V29 AI Office"})
+    return jsonify({"status": "online", "version": "StreetCore OS V30 Supreme"})
+
+
+@app.route("/supreme", methods=["GET", "POST"])
+def supreme():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        comando = request.form.get("comando") or ""
+        resposta = copiloto(comando)
+
+    return layout(f"""
+    <h1>👑 Supreme Center</h1>
+    <div class="card">
+        <form method="POST">
+            <input name="comando" placeholder="Ex: quero vender mais camisetas hoje">
+            <button>Executar análise suprema</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    """)
+
+
+@app.route("/copiloto", methods=["GET", "POST"])
+def copiloto_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        resposta = copiloto(request.form.get("pergunta") or "")
+
+    return layout(f"""
+    <h1>🧠 Copiloto Supremo</h1>
+    <div class="card">
+        <form method="POST">
+            <input name="pergunta" placeholder="O que você quer decidir?">
+            <button>Analisar</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    """)
+
+
+@app.route("/hoje")
+def hoje():
+    if not login_required():
+        return redirect("/login")
+    return layout(f"<h1>✅ Plano do Dia</h1><div class='card'><pre>{plano_do_dia()}</pre></div>")
 
 
 @app.route("/office")
@@ -533,15 +667,44 @@ def office():
         return redirect("/login")
 
     return layout(f"""
-    <h1>🏢 AI Office</h1>
+    <h1>🏢 AI Office Supremo</h1>
     <div class="grid">
-        <div class="card"><h2>Documentos</h2><div class="big">{contar("documentos")}</div><a href="/documentos">Abrir</a></div>
-        <div class="card"><h2>Conhecimento</h2><div class="big">{contar("conhecimento")}</div><a href="/conhecimento">Abrir</a></div>
-        <div class="card"><h2>Propostas</h2><div class="big">{contar("propostas")}</div><a href="/propostas">Abrir</a></div>
-        <div class="card"><h2>Atendimento</h2><div class="big">{contar("atendimentos")}</div><a href="/atendimento">Abrir</a></div>
+        <div class="card"><h2>Documentos</h2><div class="big">{contar("documentos")}</div></div>
+        <div class="card"><h2>Conhecimento</h2><div class="big">{contar("conhecimento")}</div></div>
+        <div class="card"><h2>Propostas</h2><div class="big">{contar("propostas")}</div></div>
+        <div class="card"><h2>Atendimentos</h2><div class="big">{contar("atendimentos")}</div></div>
     </div>
-    <div class="card"><pre>{relatorio()}</pre></div>
     """)
+
+
+def tabela_html(titulo, tabela, colunas):
+    if not login_required():
+        return redirect("/login")
+
+    dados = listar(tabela)
+    linhas = "".join(["<tr>" + "".join([f"<td>{x}</td>" for x in d]) + "</tr>" for d in dados])
+    head = "".join([f"<th>{c}</th>" for c in colunas])
+    return layout(f"<h1>{titulo}</h1><table><tr>{head}</tr>{linhas}</table>")
+
+
+@app.route("/pedidos")
+def pedidos():
+    return tabela_html("📦 Pedidos", "pedidos", ["ID", "Nome", "Cliente", "Status", "Data"])
+
+
+@app.route("/leads")
+def leads():
+    return tabela_html("🎯 Leads", "leads", ["ID", "Nome", "Origem", "Status", "Data"])
+
+
+@app.route("/clientes")
+def clientes():
+    return tabela_html("👤 Clientes", "clientes", ["ID", "Nome", "Contato", "Histórico", "Data"])
+
+
+@app.route("/logs")
+def logs():
+    return tabela_html("🧾 Logs", "logs", ["ID", "Mensagem", "Data"])
 
 
 @app.route("/documentos", methods=["GET", "POST"])
@@ -549,44 +712,14 @@ def documentos():
     if not login_required():
         return redirect("/login")
 
-    msg = ""
-
     if request.method == "POST":
-        titulo = request.form.get("titulo")
-        tipo = request.form.get("tipo")
-        texto = request.form.get("texto")
+        inserir("documentos", "titulo,tipo,texto", (
+            request.form.get("titulo"),
+            request.form.get("tipo"),
+            request.form.get("texto")
+        ))
 
-        conn = db()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO documentos (titulo, tipo, texto) VALUES (?, ?, ?)", (titulo, tipo, texto))
-        conn.commit()
-        conn.close()
-        msg = "Documento salvo."
-
-    dados = listar("documentos")
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>📄 Documentos</h1>
-    <div class="card">
-        <p class="ok">{msg}</p>
-        <form method="POST">
-            <input name="titulo" placeholder="Título">
-            <select name="tipo">
-                <option value="modelo">Modelo</option>
-                <option value="contrato">Contrato</option>
-                <option value="proposta">Proposta</option>
-                <option value="anotacao">Anotação</option>
-            </select>
-            <textarea name="texto" placeholder="Texto do documento"></textarea>
-            <button>Salvar documento</button>
-        </form>
-    </div>
-    <table><tr><th>ID</th><th>Título</th><th>Tipo</th><th>Texto</th><th>Data</th></tr>{linhas}</table>
-    """)
+    return tabela_html("📄 Documentos", "documentos", ["ID", "Título", "Tipo", "Texto", "Data"])
 
 
 @app.route("/conhecimento", methods=["GET", "POST"])
@@ -594,37 +727,22 @@ def conhecimento():
     if not login_required():
         return redirect("/login")
 
-    msg = ""
-
     if request.method == "POST":
-        titulo = request.form.get("titulo")
-        texto = request.form.get("texto")
+        inserir("conhecimento", "titulo,texto", (
+            request.form.get("titulo"),
+            request.form.get("texto")
+        ))
 
-        conn = db()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO conhecimento (titulo, texto) VALUES (?, ?)", (titulo, texto))
-        conn.commit()
-        conn.close()
-        msg = "Conhecimento salvo."
-
-    dados = listar("conhecimento")
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td><pre>{d[2]}</pre></td><td>{d[3]}</td></tr>"
-        for d in dados
-    ])
-
-    return layout(f"""
-    <h1>🧠 Base de Conhecimento</h1>
+    form = """
     <div class="card">
-        <p class="ok">{msg}</p>
         <form method="POST">
             <input name="titulo" placeholder="Título">
-            <textarea name="texto" placeholder="Informação importante"></textarea>
-            <button>Salvar conhecimento</button>
+            <textarea name="texto" placeholder="Conhecimento"></textarea>
+            <button>Salvar</button>
         </form>
     </div>
-    <table><tr><th>ID</th><th>Título</th><th>Texto</th><th>Data</th></tr>{linhas}</table>
-    """)
+    """
+    return layout(form + "<h1>🧠 Conhecimento</h1><pre>" + str(listar("conhecimento")) + "</pre>")
 
 
 @app.route("/propostas", methods=["GET", "POST"])
@@ -637,35 +755,22 @@ def propostas():
     if request.method == "POST":
         cliente = request.form.get("cliente")
         descricao = request.form.get("descricao")
-        resultado = gerar_proposta(cliente, descricao)
+        texto = gerar_proposta(cliente, descricao)
         valor = calcular_orcamento(descricao)
-
-        conn = db()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO propostas (cliente, descricao, valor, texto) VALUES (?, ?, ?, ?)",
-            (cliente, descricao, valor, resultado)
-        )
-        conn.commit()
-        conn.close()
-
-    dados = listar("propostas")
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>R$ {d[3]:.2f}</td><td><pre>{d[4]}</pre></td><td>{d[5]}</td></tr>"
-        for d in dados
-    ])
+        inserir("propostas", "cliente,descricao,valor,texto", (cliente, descricao, valor, texto))
+        resultado = texto
 
     return layout(f"""
-    <h1>🧾 Propostas Comerciais</h1>
+    <h1>🧾 Propostas</h1>
     <div class="card">
         <form method="POST">
             <input name="cliente" placeholder="Cliente">
-            <textarea name="descricao" placeholder="Ex: 10 camisetas personalizadas com arte"></textarea>
+            <textarea name="descricao" placeholder="Descrição"></textarea>
             <button>Gerar proposta</button>
         </form>
     </div>
     <div class="card"><pre>{resultado}</pre></div>
-    <table><tr><th>ID</th><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Texto</th><th>Data</th></tr>{linhas}</table>
+    <pre>{listar("propostas")}</pre>
     """)
 
 
@@ -677,144 +782,119 @@ def atendimento():
     resposta = ""
 
     if request.method == "POST":
-        cliente = request.form.get("cliente") or "cliente"
-        pergunta = request.form.get("pergunta") or ""
-        resposta = atendimento_automatico(cliente, pergunta)
-
-    dados = listar("atendimentos")
-    linhas = "".join([
-        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
-        for d in dados
-    ])
+        resposta = atendimento_automatico(
+            request.form.get("cliente") or "cliente",
+            request.form.get("pergunta") or ""
+        )
 
     return layout(f"""
     <h1>💬 Atendimento Automático</h1>
     <div class="card">
         <form method="POST">
-            <input name="cliente" placeholder="Nome do cliente">
-            <textarea name="pergunta" placeholder="Pergunta do cliente"></textarea>
+            <input name="cliente" placeholder="Cliente">
+            <textarea name="pergunta" placeholder="Pergunta"></textarea>
             <button>Responder</button>
         </form>
     </div>
     <div class="card"><pre>{resposta}</pre></div>
-    <table><tr><th>ID</th><th>Cliente</th><th>Pergunta</th><th>Resposta</th><th>Data</th></tr>{linhas}</table>
+    <pre>{listar("atendimentos")}</pre>
     """)
 
 
-@app.route("/buscar", methods=["GET", "POST"])
-def buscar():
+@app.route("/campanhas", methods=["GET", "POST"])
+def campanhas():
+    if not login_required():
+        return redirect("/login")
+
+    if request.method == "POST":
+        tema = request.form.get("tema") or "Street Graff"
+        texto = gerar_campanha(tema)
+        inserir("campanhas", "tema,texto", (tema, texto))
+
+    return layout(f"""
+    <h1>🚀 Campanhas</h1>
+    <div class="card">
+        <form method="POST">
+            <input name="tema" placeholder="Tema">
+            <button>Criar campanha</button>
+        </form>
+    </div>
+    <pre>{listar("campanhas")}</pre>
+    """)
+
+
+@app.route("/ideias", methods=["GET", "POST"])
+def ideias():
     if not login_required():
         return redirect("/login")
 
     resultado = ""
 
     if request.method == "POST":
-        termo = request.form.get("termo") or ""
-        resultado = busca_sistema(termo)
+        resultado = gerar_ideias(request.form.get("tema") or "Street Graff")
 
     return layout(f"""
-    <h1>🔎 Busca Geral</h1>
+    <h1>💡 Ideias</h1>
     <div class="card">
         <form method="POST">
-            <input name="termo" placeholder="Buscar em pedidos, leads, clientes, documentos e conhecimento">
-            <button>Buscar</button>
+            <input name="tema" placeholder="Tema">
+            <button>Gerar ideias</button>
         </form>
     </div>
     <div class="card"><pre>{resultado}</pre></div>
+    <pre>{listar("ideias")}</pre>
     """)
 
 
-@app.route("/command", methods=["GET", "POST"])
-def command():
+@app.route("/calendario-conteudo", methods=["GET", "POST"])
+def calendario_conteudo():
     if not login_required():
         return redirect("/login")
 
-    msg = ""
+    resultado = ""
+
     if request.method == "POST":
-        tipo = request.form.get("tipo")
-        nome = request.form.get("nome")
-        extra = request.form.get("extra")
-
-        conn = db()
-        cur = conn.cursor()
-
-        if tipo == "tarefa":
-            cur.execute("INSERT INTO tarefas (titulo) VALUES (?)", (nome,))
-            msg = "Tarefa criada."
-        elif tipo == "pedido":
-            cur.execute("INSERT INTO pedidos (nome, cliente) VALUES (?, ?)", (nome, extra))
-            msg = "Pedido criado."
-        elif tipo == "lead":
-            cur.execute("INSERT INTO leads (nome, origem) VALUES (?, ?)", (nome, extra or "painel"))
-            msg = "Lead criado."
-        elif tipo == "cliente":
-            cur.execute("INSERT INTO clientes (nome, contato, historico) VALUES (?, ?, ?)", (nome, extra, "Criado pelo painel"))
-            msg = "Cliente criado."
-        elif tipo == "notificacao":
-            cur.execute("INSERT INTO notificacoes (mensagem) VALUES (?)", (nome,))
-            msg = "Notificação criada."
-
-        conn.commit()
-        conn.close()
-        salvar_log(f"Command Center: {tipo} - {nome}")
+        tema = request.form.get("tema") or "Street Graff"
+        resultado = calendario_semanal(tema)
+        inserir("calendario_conteudo", "dia,conteudo", ("semana", resultado))
 
     return layout(f"""
-    <h1>🧠 Command Center</h1>
+    <h1>📅 Calendário de Conteúdo</h1>
     <div class="card">
-        <p class="ok">{msg}</p>
         <form method="POST">
-            <select name="tipo">
-                <option value="tarefa">Tarefa</option>
-                <option value="pedido">Pedido</option>
-                <option value="lead">Lead</option>
-                <option value="cliente">Cliente</option>
-                <option value="notificacao">Notificação</option>
-            </select>
-            <input name="nome" placeholder="Nome / descrição">
-            <input name="extra" placeholder="Extra: cliente, origem ou contato">
-            <button>Executar</button>
+            <input name="tema" placeholder="Tema">
+            <button>Gerar calendário</button>
         </form>
     </div>
+    <div class="card"><pre>{resultado}</pre></div>
+    <pre>{listar("calendario_conteudo")}</pre>
     """)
 
 
-def tabela_html(titulo, tabela, colunas):
+@app.route("/catalogo", methods=["GET", "POST"])
+def catalogo():
     if not login_required():
         return redirect("/login")
-    dados = listar(tabela)
-    linhas = "".join(["<tr>" + "".join([f"<td>{x}</td>" for x in d]) + "</tr>" for d in dados])
-    head = "".join([f"<th>{c}</th>" for c in colunas])
-    return layout(f"<h1>{titulo}</h1><table><tr>{head}</tr>{linhas}</table>")
 
+    if request.method == "POST":
+        inserir("catalogo", "produto,preco,descricao", (
+            request.form.get("produto"),
+            float(request.form.get("preco") or 0),
+            request.form.get("descricao")
+        ))
 
-@app.route("/tarefas")
-def tarefas_page():
-    return tabela_html("✅ Tarefas", "tarefas", ["ID", "Título", "Status", "Data"])
-
-
-@app.route("/producao")
-def producao_page():
-    return tabela_html("🏗️ Produção", "producao", ["ID", "Item", "Cliente", "Status", "Data"])
-
-
-@app.route("/estoque")
-def estoque_page():
-    return tabela_html("📦 Estoque", "estoque", ["ID", "Item", "Quantidade", "Data"])
-
-
-@app.route("/clientes")
-def clientes_page():
-    return tabela_html("👤 Clientes", "clientes", ["ID", "Nome", "Contato", "Histórico", "Data"])
-
-
-@app.route("/pedidos")
-def pedidos_page():
-    return tabela_html("📦 Pedidos", "pedidos", ["ID", "Nome", "Cliente", "Status", "Data"])
-
-
-@app.route("/leads")
-def leads_page():
-    return tabela_html("🎯 Leads", "leads", ["ID", "Nome", "Origem", "Status", "Data"])
+    return layout(f"""
+    <h1>🛍️ Catálogo</h1>
+    <div class="card">
+        <form method="POST">
+            <input name="produto" placeholder="Produto">
+            <input name="preco" placeholder="Preço">
+            <textarea name="descricao" placeholder="Descrição"></textarea>
+            <button>Salvar produto</button>
+        </form>
+    </div>
+    <pre>{listar("catalogo")}</pre>
+    """)
 
 
 @app.route("/financeiro-web")
@@ -832,229 +912,192 @@ def financeiro_web():
     """)
 
 
-@app.route("/conteudo", methods=["GET", "POST"])
-def conteudo():
-    if not login_required():
-        return redirect("/login")
-    resultado = ""
-    if request.method == "POST":
-        tema = request.form.get("tema") or "Street Graff"
-        tipo = request.form.get("tipo")
-        if tipo == "post":
-            resultado = gerar_post(tema)
-        elif tipo == "story":
-            resultado = gerar_story(tema)
-        elif tipo == "reels":
-            resultado = gerar_reels(tema)
-        else:
-            resultado = gerar_campanha(tema)
-
-        conn = db()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO conteudos (tema, tipo, texto) VALUES (?, ?, ?)", (tema, tipo, resultado))
-        conn.commit()
-        conn.close()
-
-    return layout(f"""
-    <h1>🤖 Gerador IA</h1>
-    <div class="card">
-        <form method="POST">
-            <input name="tema" placeholder="Tema">
-            <select name="tipo">
-                <option value="post">Post</option>
-                <option value="story">Story</option>
-                <option value="reels">Reels</option>
-                <option value="campanha">Campanha</option>
-            </select>
-            <button>Gerar</button>
-        </form>
-    </div>
-    <div class="card"><textarea>{resultado}</textarea></div>
-    """)
-
-
 @app.route("/relatorio-web")
 def relatorio_web():
     if not login_required():
         return redirect("/login")
-    return layout(f"<h1>📊 Relatório</h1><div class='card'><pre>{relatorio()}</pre></div>")
+    return layout(f"<h1>📊 Relatório Supremo</h1><div class='card'><pre>{relatorio()}</pre></div>")
 
 
-@app.route("/logs")
-def logs_page():
-    return tabela_html("🧾 Logs", "logs", ["ID", "Mensagem", "Data"])
+@app.route("/buscar", methods=["GET", "POST"])
+def buscar():
+    if not login_required():
+        return redirect("/login")
+
+    resultado = ""
+
+    if request.method == "POST":
+        resultado = busca_sistema(request.form.get("termo") or "")
+
+    return layout(f"""
+    <h1>🔎 Busca Geral</h1>
+    <div class="card">
+        <form method="POST">
+            <input name="termo" placeholder="Buscar">
+            <button>Buscar</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resultado}</pre></div>
+    """)
 
 
 @app.route("/backup")
 def backup():
     if not login_required():
         return redirect("/login")
-    nome = f"backup_v29_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    nome = f"backup_v30_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     with open(DB_PATH, "rb") as f:
         data = f.read()
     return Response(data, mimetype="application/octet-stream", headers={"Content-Disposition": f"attachment;filename={nome}"})
 
 
+async def responder_texto(update, texto):
+    await update.message.reply_text(texto)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🔥 STREETCORE OS V29 AI OFFICE\n\n"
+    await responder_texto(update,
+        "🔥 STREETCORE OS V30 SUPREME\n\n"
+        "/supreme vender mais hoje\n"
+        "/hoje\n"
+        "/relatorio\n"
         "/atender cliente pergunta\n"
         "/proposta cliente descricao\n"
         "/contrato cliente servico valor\n"
-        "/doc titulo texto\n"
-        "/saber titulo texto\n"
-        "/buscar termo\n"
+        "/ideias camisetas\n"
+        "/calendario street graff\n"
         "/pedido camiseta joao\n"
         "/lead maria instagram\n"
+        "/cliente joao 119999 historico\n"
         "/receita 100\n"
         "/despesa 50\n"
         "/financeiro\n"
         "/post camisetas\n"
+        "/story adesivos\n"
+        "/reels canecas\n"
         "/campanha street graff\n"
-        "/relatorio"
+        "/buscar termo"
     )
 
 
-async def responder_generico(update, texto):
-    await update.message.reply_text(texto)
+async def supreme_cmd(update, context):
+    await responder_texto(update, copiloto(" ".join(context.args)))
+
+
+async def hoje_cmd(update, context):
+    await responder_texto(update, plano_do_dia())
+
+
+async def relatorio_cmd(update, context):
+    await responder_texto(update, relatorio())
 
 
 async def atender_cmd(update, context):
     if len(context.args) < 2:
-        await responder_generico(update, "Use: /atender cliente pergunta")
+        await responder_texto(update, "Use: /atender cliente pergunta")
         return
-    cliente = context.args[0]
-    pergunta = " ".join(context.args[1:])
-    await responder_generico(update, atendimento_automatico(cliente, pergunta))
+    await responder_texto(update, atendimento_automatico(context.args[0], " ".join(context.args[1:])))
 
 
 async def proposta_cmd(update, context):
     if len(context.args) < 2:
-        await responder_generico(update, "Use: /proposta cliente descricao")
+        await responder_texto(update, "Use: /proposta cliente descricao")
         return
     cliente = context.args[0]
-    descricao = " ".join(context.args[1:])
-    texto = gerar_proposta(cliente, descricao)
-    valor = calcular_orcamento(descricao)
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO propostas (cliente, descricao, valor, texto) VALUES (?, ?, ?, ?)", (cliente, descricao, valor, texto))
-    conn.commit()
-    conn.close()
-
-    await responder_generico(update, texto)
+    desc = " ".join(context.args[1:])
+    texto = gerar_proposta(cliente, desc)
+    inserir("propostas", "cliente,descricao,valor,texto", (cliente, desc, calcular_orcamento(desc), texto))
+    await responder_texto(update, texto)
 
 
 async def contrato_cmd(update, context):
     if len(context.args) < 3:
-        await responder_generico(update, "Use: /contrato cliente servico valor")
+        await responder_texto(update, "Use: /contrato cliente servico valor")
         return
-    cliente = context.args[0]
-    valor = context.args[-1]
-    servico = " ".join(context.args[1:-1])
-    await responder_generico(update, gerar_contrato(cliente, servico, valor))
+    await responder_texto(update, gerar_contrato(context.args[0], " ".join(context.args[1:-1]), context.args[-1]))
 
 
-async def doc_cmd(update, context):
-    if len(context.args) < 2:
-        await responder_generico(update, "Use: /doc titulo texto")
-        return
-    titulo = context.args[0]
-    texto = " ".join(context.args[1:])
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO documentos (titulo, tipo, texto) VALUES (?, ?, ?)", (titulo, "telegram", texto))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, "📄 Documento salvo.")
+async def ideias_cmd(update, context):
+    await responder_texto(update, gerar_ideias(" ".join(context.args) or "Street Graff"))
 
 
-async def saber_cmd(update, context):
-    if len(context.args) < 2:
-        await responder_generico(update, "Use: /saber titulo texto")
-        return
-    titulo = context.args[0]
-    texto = " ".join(context.args[1:])
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO conhecimento (titulo, texto) VALUES (?, ?)", (titulo, texto))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, "🧠 Conhecimento salvo.")
-
-
-async def buscar_cmd(update, context):
-    termo = " ".join(context.args)
-    await responder_generico(update, busca_sistema(termo))
+async def calendario_cmd(update, context):
+    tema = " ".join(context.args) or "Street Graff"
+    texto = calendario_semanal(tema)
+    inserir("calendario_conteudo", "dia,conteudo", ("semana", texto))
+    await responder_texto(update, texto)
 
 
 async def pedido_cmd(update, context):
     item = context.args[0] if context.args else ""
     cliente = " ".join(context.args[1:]) if len(context.args) > 1 else ""
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO pedidos (nome, cliente) VALUES (?, ?)", (item, cliente))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, "📦 Pedido criado.")
+    inserir("pedidos", "nome,cliente", (item, cliente))
+    await responder_texto(update, "📦 Pedido criado.")
 
 
 async def lead_cmd(update, context):
     nome = context.args[0] if context.args else ""
     origem = " ".join(context.args[1:]) if len(context.args) > 1 else "manual"
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO leads (nome, origem) VALUES (?, ?)", (nome, origem))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, "🎯 Lead criado.")
+    inserir("leads", "nome,origem", (nome, origem))
+    await responder_texto(update, "🎯 Lead criado.")
+
+
+async def cliente_cmd(update, context):
+    if len(context.args) < 2:
+        await responder_texto(update, "Use: /cliente nome contato historico")
+        return
+    inserir("clientes", "nome,contato,historico", (context.args[0], context.args[1], " ".join(context.args[2:])))
+    await responder_texto(update, "👤 Cliente criado.")
 
 
 async def receita_cmd(update, context):
     valor = float(context.args[0].replace(",", "."))
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("receita", valor, "telegram"))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, f"💰 Receita R$ {valor:.2f}")
+    inserir("financeiro", "tipo,valor,descricao", ("receita", valor, "telegram"))
+    await responder_texto(update, f"💰 Receita R$ {valor:.2f}")
 
 
 async def despesa_cmd(update, context):
     valor = float(context.args[0].replace(",", "."))
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", valor, "telegram"))
-    conn.commit()
-    conn.close()
-    await responder_generico(update, f"💸 Despesa R$ {valor:.2f}")
+    inserir("financeiro", "tipo,valor,descricao", ("despesa", valor, "telegram"))
+    await responder_texto(update, f"💸 Despesa R$ {valor:.2f}")
 
 
 async def financeiro_cmd(update, context):
     r, d, l = financeiro()
-    await responder_generico(update, f"💵 FINANCEIRO\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}")
+    await responder_texto(update, f"💵 FINANCEIRO\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}")
 
 
 async def post_cmd(update, context):
-    await responder_generico(update, gerar_post(" ".join(context.args) or "Street Graff"))
+    await responder_texto(update, gerar_post(" ".join(context.args) or "Street Graff"))
+
+
+async def story_cmd(update, context):
+    await responder_texto(update, gerar_story(" ".join(context.args) or "Street Graff"))
+
+
+async def reels_cmd(update, context):
+    await responder_texto(update, gerar_reels(" ".join(context.args) or "Street Graff"))
 
 
 async def campanha_cmd(update, context):
-    await responder_generico(update, gerar_campanha(" ".join(context.args) or "Street Graff"))
+    tema = " ".join(context.args) or "Street Graff"
+    texto = gerar_campanha(tema)
+    inserir("campanhas", "tema,texto", (tema, texto))
+    await responder_texto(update, texto)
 
 
-async def relatorio_cmd(update, context):
-    await responder_generico(update, relatorio())
+async def buscar_cmd(update, context):
+    await responder_texto(update, busca_sistema(" ".join(context.args)))
 
 
 async def status_cmd(update, context):
-    await responder_generico(update, "✅ V29 AI Office online.")
+    await responder_texto(update, "✅ V30 Supreme OS online.")
 
 
 async def responder(update, context):
-    salvar_log(update.message.text)
-    await responder_generico(update, faq_resposta(update.message.text))
+    msg = update.message.text
+    salvar_log(msg)
+    await responder_texto(update, faq_resposta(msg))
 
 
 async def telegram_main():
@@ -1063,32 +1106,37 @@ async def telegram_main():
     comandos = {
         "start": start,
         "status": status_cmd,
+        "supreme": supreme_cmd,
+        "hoje": hoje_cmd,
+        "relatorio": relatorio_cmd,
         "atender": atender_cmd,
         "proposta": proposta_cmd,
         "contrato": contrato_cmd,
-        "doc": doc_cmd,
-        "saber": saber_cmd,
-        "buscar": buscar_cmd,
+        "ideias": ideias_cmd,
+        "calendario": calendario_cmd,
         "pedido": pedido_cmd,
         "lead": lead_cmd,
+        "cliente": cliente_cmd,
         "receita": receita_cmd,
         "despesa": despesa_cmd,
         "financeiro": financeiro_cmd,
         "post": post_cmd,
+        "story": story_cmd,
+        "reels": reels_cmd,
         "campanha": campanha_cmd,
-        "relatorio": relatorio_cmd,
+        "buscar": buscar_cmd,
     }
 
-    for nome, func in comandos.items():
-        bot.add_handler(CommandHandler(nome, func))
+    for nome, funcao in comandos.items():
+        bot.add_handler(CommandHandler(nome, funcao))
 
     bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V29...")
+    print("🔥 Telegram iniciando V30 Supreme...")
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V29")
+    print("✅ Telegram ONLINE V30 Supreme")
 
     await asyncio.Event().wait()
 
