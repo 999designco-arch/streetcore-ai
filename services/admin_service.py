@@ -2,7 +2,7 @@ def painel_admin():
     return """
     <html>
     <head>
-        <title>StreetCore OS V12 FREE</title>
+        <title>StreetCore OS V14 FREE</title>
         <style>
             body {
                 background: #050505;
@@ -27,7 +27,7 @@ def painel_admin():
         </style>
     </head>
     <body>
-        <h1>🔥 STREETCORE OS V12 FREE</h1>
+        <h1>🔥 STREETCORE OS V14 FREE</h1>
 
         <div class="card">
             <h2>Status</h2>
@@ -39,15 +39,13 @@ def painel_admin():
         </div>
 
         <div class="card">
-            <h2>Funções V12</h2>
-            <p>IA grátis por regras inteligentes</p>
+            <h2>Novidades V14</h2>
+            <p>Upload de arquivos pelo Telegram</p>
+            <p>Leitura de TXT e PDF</p>
+            <p>Base de conhecimento persistente</p>
+            <p>Busca por conhecimento</p>
             <p>Memória persistente SQLite</p>
             <p>Analytics persistente SQLite</p>
-            <p>Posts, Stories e Reels</p>
-            <p>Campanhas completas</p>
-            <p>Grade semanal de conteúdo</p>
-            <p>Legendas e hashtags</p>
-            <p>Workflows automáticos</p>
         </div>
     </body>
     </html>
