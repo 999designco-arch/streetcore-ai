@@ -1,5 +1,6 @@
 import os
 import threading
+import asyncio
 from flask import Flask, jsonify, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
@@ -10,7 +11,6 @@ from services.image_service import gerar_prompt_imagem
 from services.video_service import gerar_roteiro_video
 from services.memory_service import salvar_memoria, listar_memorias
 from services.analytics_service import registrar_evento, resumo_analytics
-from services.automation_service import criar_automacao
 from services.workflow_service import executar_workflow
 from services.database_service import iniciar_banco
 from services.sales_service import gerar_texto_venda
@@ -22,9 +22,8 @@ from services.agent_service import agentes_conversando
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not TELEGRAM_TOKEN:
-    raise ValueError("TELEGRAM_TOKEN não encontrado nas variáveis de ambiente.")
+    raise ValueError("TELEGRAM_TOKEN não encontrado.")
 
-# IMPORTANTE: Railway/Gunicorn procura uma variável chamada app
 app = Flask(__name__)
 
 iniciar_banco()
@@ -61,7 +60,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     registrar_evento("start")
     await update.message.reply_text(
         "🔥 STREETCORE OS V11 ONLINE\n\n"
-        "Comandos:\n"
         "/status\n"
         "/post camisetas\n"
         "/story adesivos\n"
@@ -145,10 +143,9 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem = update.message.text
     salvar_memoria(mensagem)
     registrar_evento("mensagem")
-    resposta = gerar_resposta_ia(mensagem)
-    await update.message.reply_text(resposta)
+    await update.message.reply_text(gerar_resposta_ia(mensagem))
 
-def run_telegram():
+async def telegram_main():
     telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     telegram_app.add_handler(CommandHandler("start", start))
@@ -168,13 +165,22 @@ def run_telegram():
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
     print("🔥 Telegram iniciando...")
-    telegram_app.run_polling(stop_signals=None)
 
-# Inicia Telegram em segundo plano
-if TELEGRAM_TOKEN:
-    threading.Thread(target=run_telegram, daemon=True).start()
+    await telegram_app.initialize()
+    await telegram_app.start()
+    await telegram_app.updater.start_polling()
 
-# Para rodar localmente
+    print("✅ Telegram ONLINE")
+
+    await asyncio.Event().wait()
+
+def run_telegram():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(telegram_main())
+
+threading.Thread(target=run_telegram, daemon=True).start()
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
