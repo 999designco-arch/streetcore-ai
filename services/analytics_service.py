@@ -5,6 +5,8 @@ def registrar_evento(nome):
 
 def resumo_analytics():
     return {
+        "versao": "V11",
         "eventos": eventos,
+        "total_eventos": sum(eventos.values()),
         "status": "analytics ativo"
     }
