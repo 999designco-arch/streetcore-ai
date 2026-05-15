@@ -16,16 +16,17 @@ def resumo_analytics():
     total = cursor.fetchone()[0]
 
     cursor.execute("""
-        SELECT evento, COUNT(*) 
-        FROM analytics 
-        GROUP BY evento 
+        SELECT evento, COUNT(*)
+        FROM analytics
+        GROUP BY evento
         ORDER BY COUNT(*) DESC
     """)
     eventos = cursor.fetchall()
+
     conn.close()
 
     return {
-        "versao": "V12 FREE",
+        "versao": "V14 FREE",
         "total_eventos": total,
         "eventos": {nome: quantidade for nome, quantidade in eventos},
         "status": "analytics persistente ativo"
