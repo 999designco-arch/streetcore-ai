@@ -6,7 +6,7 @@ def painel_admin():
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V17 FREE</title>
+        <title>StreetCore OS V18 FREE</title>
         <style>
             body {{
                 background: #050505;
@@ -28,7 +28,7 @@ def painel_admin():
         </style>
     </head>
     <body>
-        <h1>🔥 STREETCORE OS V17 FREE</h1>
+        <h1>🔥 STREETCORE OS V18 FREE</h1>
 
         <div class="card">
             <h2>Status</h2>
@@ -40,12 +40,12 @@ def painel_admin():
         </div>
 
         <div class="card">
-            <h2>Novidades V17</h2>
-            <p>Pedidos persistentes</p>
-            <p>Orçamentos automáticos</p>
-            <p>Estoque simples</p>
-            <p>Notificações internas</p>
-            <p>Operação comercial gratuita</p>
+            <h2>Novidades V18</h2>
+            <p>Despesas e lucro estimado</p>
+            <p>Fornecedores persistentes</p>
+            <p>Status de produção</p>
+            <p>Backup simples do banco</p>
+            <p>Operação comercial mais completa</p>
         </div>
 
         <div class="card">
