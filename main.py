@@ -34,7 +34,8 @@ AGENTS = {
     "conteudo": "Você é o Content Agent. Foque em conteúdo viral.",
     "vendas": "Você é o Sales Agent. Foque em oferta, copy e conversão.",
     "dev": "Você é o Dev Agent. Foque em tecnologia, código e deploy grátis.",
-    "automacao": "Você é o Automation Agent. Foque em automações gratuitas."
+    "automacao": "Você é o Automation Agent. Foque em automações gratuitas.",
+    "assistente": "Você é o Personal Assistant Agent. Foque em rotina, agenda e organização."
 }
 
 def load_json(file, default):
@@ -119,56 +120,46 @@ def auto_memory(msg):
     save_memory(mem)
 
 async def start(update, context):
-    await update.message.reply_text("🔥 StreetCore AI online. Digite /menu para abrir a central.")
+    await update.message.reply_text("🔥 StreetCore AI online. Agora também entendo comandos em linguagem natural. Digite /menu.")
 
 async def menu(update, context):
     await update.message.reply_text("""
 🔥 STREETCORE AI — CENTRAL
 
-ESSENCIAL:
+COMANDOS:
 /menu
 /status
 /memoria
 
-MEMÓRIA:
-/perfil nome = Rafael
-/objetivo criar uma marca
-/preferencia usar ferramentas grátis
-
-TAREFAS:
-/tarefa
+/tarefa criar algo
 /tarefas
 /check
-/concluir
+/concluir 1
 
-MULTIAGENTES:
-/ceo
-/brandagent
-/contentagent
-/salesagent
-/devagent
-/autoagent
-/agent
+/ceo objetivo
+/brandagent marca
+/contentagent tema
+/salesagent produto
+/devagent projeto
+/autoagent automação
+/agent objetivo completo
 
-BACKUP:
-/backup
-/exportar
-/listar
-/historico
-/apagaritem
-
-EXECUÇÃO AUTOMÁTICA:
 /ativar
 /agendar 09:00 revisar tarefas
 /agendamentos
-/removeragendamento 1
+
+LINGUAGEM NATURAL:
+"crie uma tarefa para..."
+"me lembra de..."
+"faça um plano para hoje"
+"crie um roadmap para..."
+"analise como CEO..."
+"crie conteúdo sobre..."
+"crie uma automação para..."
 """)
 
 async def status(update, context):
     mem = memory()
-    schedules = load_json(FILES["schedules"], [])
-    config = load_json(FILES["config"], {})
-
     await update.message.reply_text(f"""
 🚀 STATUS
 
@@ -177,16 +168,14 @@ Objetivos: {len(mem.get("objetivos", []))}
 Preferências: {len(mem.get("preferencias", []))}
 Tarefas: {len(load_json(FILES["tasks"], []))}
 Itens salvos: {len(load_json(FILES["items"], []))}
-Agendamentos: {len(schedules)}
-Chat ativado: {"sim" if config.get("chat_id") else "não"}
+Agendamentos: {len(load_json(FILES["schedules"], []))}
 
 Sistema: ONLINE
-Modo: EXECUÇÃO AUTOMÁTICA
+Modo: EXECUÇÃO AUTOMÁTICA + LINGUAGEM NATURAL
 """)
 
 async def memoria(update, context):
     mem = memory()
-
     text = "🧠 MEMÓRIA:\n\n"
 
     text += "👤 PERFIL:\n"
@@ -205,7 +194,6 @@ async def memoria(update, context):
 
 async def perfil(update, context):
     texto = " ".join(context.args)
-
     if "=" not in texto:
         await update.message.reply_text("Use:\n/perfil nome = Rafael")
         return
@@ -219,7 +207,6 @@ async def perfil(update, context):
 
 async def objetivo(update, context):
     texto = " ".join(context.args)
-
     if not texto:
         await update.message.reply_text("Use:\n/objetivo criar minha empresa de IA")
         return
@@ -232,7 +219,6 @@ async def objetivo(update, context):
 
 async def preferencia(update, context):
     texto = " ".join(context.args)
-
     if not texto:
         await update.message.reply_text("Use:\n/preferencia usar apenas ferramentas grátis")
         return
@@ -245,7 +231,9 @@ async def preferencia(update, context):
 
 async def tarefa(update, context):
     nome = " ".join(context.args)
+    await criar_tarefa(update, nome)
 
+async def criar_tarefa(update, nome):
     if not nome:
         await update.message.reply_text("Use:\n/tarefa criar logo da marca")
         return
@@ -258,7 +246,7 @@ async def tarefa(update, context):
     })
     save_json(FILES["tasks"], tasks)
 
-    await update.message.reply_text("✅ Tarefa criada.")
+    await update.message.reply_text(f"✅ Tarefa criada:\n{nome}")
 
 async def tarefas(update, context):
     tasks = load_json(FILES["tasks"], [])
@@ -268,7 +256,6 @@ async def tarefas(update, context):
         return
 
     text = "📝 TAREFAS:\n\n"
-
     for i, t in enumerate(tasks, 1):
         text += f"{i}. {t['tarefa']} — {t['status']}\n"
 
@@ -277,7 +264,6 @@ async def tarefas(update, context):
 async def check(update, context):
     tasks = load_json(FILES["tasks"], [])
     text = "⚠️ PENDENTES:\n\n"
-
     found = False
 
     for i, t in enumerate(tasks, 1):
@@ -307,9 +293,11 @@ async def generic(update, context, tipo, prompt, agent=None):
         await update.message.reply_text(f"Use:\n/{tipo} tema")
         return
 
+    await gerar_resposta_salva(update, tipo, tema, prompt, agent)
+
+async def gerar_resposta_salva(update, tipo, tema, prompt, agent=None):
     resposta = ask_ai(prompt + "\n\nTema:\n" + tema, agent)
     save_item(tipo, tema, resposta)
-
     await send_long(update, resposta)
 
 async def ceo(update, context):
@@ -354,7 +342,6 @@ Resolva usando múltiplos agentes:
 
     resposta = ask_ai(prompt)
     save_item("multiagent", tema, resposta)
-
     await send_long(update, resposta)
 
 async def backup(update, context):
@@ -407,7 +394,6 @@ async def listar(update, context):
         return
 
     text = "📚 ITENS SALVOS:\n\n"
-
     for i, item in enumerate(items, 1):
         text += f"{i}. [{item['tipo']}] {item['tema']}\n"
 
@@ -421,7 +407,6 @@ async def historico(update, context):
         return
 
     text = "🕘 HISTÓRICO:\n\n"
-
     for i, item in enumerate(items[-20:], 1):
         text += f"{i}. {item['tipo']} — {item['tema']} — {item['data']}\n"
 
@@ -458,11 +443,10 @@ async def agendar(update, context):
     try:
         datetime.strptime(hora, "%H:%M")
     except:
-        await update.message.reply_text("Horário inválido. Use assim:\n/agendar 09:00 revisar tarefas")
+        await update.message.reply_text("Horário inválido. Use:\n/agendar 09:00 revisar tarefas")
         return
 
     schedules = load_json(FILES["schedules"], [])
-
     schedules.append({
         "hora": hora,
         "acao": acao,
@@ -470,7 +454,6 @@ async def agendar(update, context):
         "ultimo_disparo": "",
         "data": str(datetime.now(TZ))
     })
-
     save_json(FILES["schedules"], schedules)
 
     await update.message.reply_text(f"⏰ Agendamento criado:\n{hora} — {acao}")
@@ -483,7 +466,6 @@ async def agendamentos(update, context):
         return
 
     text = "⏰ AGENDAMENTOS:\n\n"
-
     for i, s in enumerate(schedules, 1):
         status = "ativo" if s.get("ativo") else "pausado"
         text += f"{i}. {s['hora']} — {s['acao']} — {status}\n"
@@ -522,7 +504,7 @@ async def scheduled_checker(context):
         if s.get("hora") == current_time and s.get("ultimo_disparo") != today:
             acao = s.get("acao", "")
 
-            prompt = f"""
+            resposta = ask_ai(f"""
 Execute este agendamento como assistente operacional:
 
 Ação programada:
@@ -534,20 +516,12 @@ Entregue:
 3. Passo 2
 4. Passo 3
 5. Próxima ação imediata
-"""
+""", "assistente")
 
-            resposta = ask_ai(prompt, "assistente")
-
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"⏰ AGENDAMENTO AUTOMÁTICO\n\n{s['hora']} — {acao}"
-            )
+            await context.bot.send_message(chat_id=chat_id, text=f"⏰ AGENDAMENTO AUTOMÁTICO\n\n{s['hora']} — {acao}")
 
             for i in range(0, len(resposta), 3900):
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=resposta[i:i+3900]
-                )
+                await context.bot.send_message(chat_id=chat_id, text=resposta[i:i+3900])
 
             s["ultimo_disparo"] = today
             changed = True
@@ -555,9 +529,62 @@ Entregue:
     if changed:
         save_json(FILES["schedules"], schedules)
 
+async def linguagem_natural(update, msg):
+    text = msg.lower().strip()
+
+    if text.startswith("crie uma tarefa") or text.startswith("criar tarefa") or text.startswith("tarefa"):
+        tarefa_texto = text.replace("crie uma tarefa", "").replace("criar tarefa", "").replace("tarefa", "").replace("para", "").strip()
+        await criar_tarefa(update, tarefa_texto or msg)
+        return True
+
+    if text.startswith("me lembra") or text.startswith("lembre"):
+        lembrete = msg.replace("me lembra", "").replace("Me lembra", "").replace("lembre", "").strip()
+        assist = load_json(FILES["assistant"], [])
+        assist.append({
+            "tipo": "lembrete",
+            "conteudo": lembrete,
+            "data": str(datetime.now(TZ))
+        })
+        save_json(FILES["assistant"], assist)
+        await update.message.reply_text(f"🔔 Lembrete salvo:\n{lembrete}")
+        return True
+
+    if "plano para hoje" in text or "planeje meu dia" in text or "meu dia" == text:
+        tasks = load_json(FILES["tasks"], [])
+        resposta = ask_ai(f"Monte meu plano de hoje com base nestas tarefas:\n{tasks}", "assistente")
+        await send_long(update, resposta)
+        return True
+
+    if "roadmap" in text or "plano completo" in text:
+        await gerar_resposta_salva(update, "roadmap", msg, "Crie um roadmap executivo completo.", "ceo")
+        return True
+
+    if "como ceo" in text or "analise como ceo" in text:
+        await gerar_resposta_salva(update, "ceo", msg, "Analise como CEO e entregue estratégia prática.", "ceo")
+        return True
+
+    if "conteúdo" in text or "conteudo" in text or "post" in text or "reels" in text:
+        await gerar_resposta_salva(update, "conteudo", msg, "Crie estratégia de conteúdo viral.", "conteudo")
+        return True
+
+    if "automação" in text or "automacao" in text or "automatizar" in text:
+        await gerar_resposta_salva(update, "automacao", msg, "Crie automação gratuita passo a passo.", "automacao")
+        return True
+
+    if "site" in text or "landing page" in text:
+        await gerar_resposta_salva(update, "dev", msg, "Crie solução técnica/site com ferramentas grátis.", "dev")
+        return True
+
+    return False
+
 async def handle_message(update, context):
     msg = update.message.text
     auto_memory(msg)
+
+    handled = await linguagem_natural(update, msg)
+    if handled:
+        return
+
     resposta = ask_ai(msg)
     await send_long(update, resposta)
 
@@ -600,5 +627,5 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 app.job_queue.run_repeating(scheduled_checker, interval=60, first=10)
 
-print("🔥 STREETCORE AI AUTOMATIC EXECUTION MODE ONLINE")
+print("🔥 STREETCORE AI NATURAL LANGUAGE MODE ONLINE")
 app.run_polling()
