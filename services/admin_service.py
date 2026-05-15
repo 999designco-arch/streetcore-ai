@@ -1,52 +1,82 @@
+from services.auth_service import obter_api_key
+
 def painel_admin():
-    return """
+
+    api_key = obter_api_key()
+
+    return f"""
     <html>
     <head>
-        <title>StreetCore OS V14 FREE</title>
+        <title>StreetCore OS V15 FREE</title>
+
         <style>
-            body {
+
+            body {{
                 background: #050505;
                 color: white;
                 font-family: Arial;
                 padding: 30px;
-            }
-            .card {
+            }}
+
+            .card {{
                 background: #111;
                 padding: 20px;
                 border-radius: 12px;
                 margin-bottom: 15px;
                 border: 1px solid #333;
-            }
-            .ok {
+            }}
+
+            .ok {{
                 color: #00ff88;
                 font-weight: bold;
-            }
-            h1 {
+            }}
+
+            h1 {{
                 font-size: 34px;
-            }
+            }}
+
         </style>
     </head>
+
     <body>
-        <h1>🔥 STREETCORE OS V14 FREE</h1>
+
+        <h1>🔥 STREETCORE OS V15 FREE</h1>
 
         <div class="card">
+
             <h2>Status</h2>
-            <p class="ok">Sistema online</p>
+
+            <p class="ok">
+                Sistema online
+            </p>
+
             <p>Telegram ativo</p>
             <p>Flask ativo</p>
             <p>Railway ativo</p>
-            <p>Modo gratuito</p>
+            <p>SQLite ativo</p>
+
         </div>
 
         <div class="card">
-            <h2>Novidades V14</h2>
-            <p>Upload de arquivos pelo Telegram</p>
-            <p>Leitura de TXT e PDF</p>
-            <p>Base de conhecimento persistente</p>
-            <p>Busca por conhecimento</p>
-            <p>Memória persistente SQLite</p>
-            <p>Analytics persistente SQLite</p>
+
+            <h2>Novidades V15</h2>
+
+            <p>Autenticação simples</p>
+            <p>Tarefas persistentes</p>
+            <p>Logs persistentes</p>
+            <p>Scheduler operacional</p>
+            <p>Modo operacional IA</p>
+
         </div>
+
+        <div class="card">
+
+            <h2>API KEY</h2>
+
+            <p>{api_key}</p>
+
+        </div>
+
     </body>
     </html>
     """
