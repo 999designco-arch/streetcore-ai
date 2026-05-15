@@ -1,10 +1,16 @@
 import os
-import json
 import sqlite3
 import urllib.parse
 import threading
 
-from flask import Flask, jsonify, request, render_template_string
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    render_template_string
+)
+
+from werkzeug.utils import secure_filename
 
 from telegram.ext import (
     ApplicationBuilder,
@@ -23,6 +29,10 @@ from pypdf import PdfReader
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 8080))
+
+UPLOAD_FOLDER = "uploads"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -60,10 +70,18 @@ response TEXT
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS files(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+filename TEXT,
+content TEXT
+)
+""")
+
 conn.commit()
 
 # =========================================
-# MASTER PROMPT
+# PROMPT
 # =========================================
 
 MASTER_PROMPT = """
@@ -77,16 +95,16 @@ Você possui:
 - automação;
 - programação;
 - growth hacking;
-- criação de conteúdo;
-- engenharia de IA;
 - marketing;
-- direção criativa.
+- criação de conteúdo;
+- engenharia de IA.
 
 Responda:
 - em português;
-- de forma prática;
 - passo a passo;
-- como se estivesse fazendo pelo usuário.
+- como se estivesse fazendo pelo usuário;
+- de forma prática;
+- extremamente estratégica.
 
 Use ferramentas gratuitas.
 """
@@ -99,52 +117,51 @@ AGENTS = {
 
 "ceo":
 """
-Você é um CEO especialista em:
+Você é CEO especialista em:
+- SaaS
 - negócios digitais
 - monetização
-- SaaS
-- crescimento
-- IA
 - escala
+- IA
 """,
 
 "marketing":
 """
 Você é especialista em:
 - branding
-- marketing
-- conteúdo
 - viralização
+- conteúdo
 - copywriting
+- funis
 """,
 
 "dev":
 """
 Você é engenheiro especialista em:
 - Python
-- APIs
 - IA
+- APIs
 - automação
-- SaaS
+- sistemas
 """,
 
 "design":
 """
 Você é diretor criativo premium especialista em:
 - cyberpunk premium
+- cinematic
 - branding
 - thumbnails
 - logos
-- cinematic
 """,
 
 "automation":
 """
 Você é especialista em:
-- agentes IA
 - automações
-- produtividade
 - workflows
+- produtividade
+- agentes IA
 """
 }
 
@@ -163,6 +180,7 @@ def ask_ai(prompt, role="ceo"):
     )
 
     response = client.chat.completions.create(
+
         model="llama-3.3-70b-versatile",
 
         messages=[
@@ -188,7 +206,7 @@ def ask_ai(prompt, role="ceo"):
         ],
 
         temperature=0.8,
-        max_tokens=3000
+        max_tokens=4000
     )
 
     result = response.choices[0].message.content
@@ -213,6 +231,32 @@ def image_url(prompt):
     return f"https://image.pollinations.ai/prompt/{encoded}"
 
 # =========================================
+# FILE READER
+# =========================================
+
+def read_file(path):
+
+    content = ""
+
+    if path.endswith(".pdf"):
+
+        reader = PdfReader(path)
+
+        for page in reader.pages:
+
+            try:
+                content += page.extract_text() + "\n"
+            except:
+                pass
+
+    elif path.endswith(".txt"):
+
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+    return content[:50000]
+
+# =========================================
 # TELEGRAM
 # =========================================
 
@@ -220,7 +264,7 @@ async def start(update, context):
 
     await update.message.reply_text(
 """
-🔥 StreetCore OS V3 online.
+🔥 StreetCore OS V4 online.
 
 Digite:
 /menu
@@ -231,7 +275,7 @@ async def menu(update, context):
 
     await update.message.reply_text(
 """
-🔥 STREETCORE OS V3
+🔥 STREETCORE OS V4
 
 /completo ideia
 /ceo ideia
@@ -274,6 +318,10 @@ async def status(update, context):
         "SELECT COUNT(*) FROM memory"
     ).fetchone()[0]
 
+    file_count = cursor.execute(
+        "SELECT COUNT(*) FROM files"
+    ).fetchone()[0]
+
     await update.message.reply_text(
 f"""
 🔥 STREETCORE STATUS
@@ -281,13 +329,14 @@ f"""
 Memórias: {mem_count}
 Tarefas: {task_count}
 Histórico: {history_count}
+Arquivos: {file_count}
 
 Sistema:
 ✅ Online
 ✅ Dashboard
+✅ Upload IA
+✅ SQLite
 ✅ Multi Agents
-✅ Banco SQLite
-✅ IA ativa
 """
 )
 
@@ -316,21 +365,15 @@ async def tarefas(update, context):
         "SELECT * FROM tasks ORDER BY id DESC LIMIT 30"
     ).fetchall()
 
-    if not tasks:
-
-        await update.message.reply_text(
-            "Nenhuma tarefa."
-        )
-
-        return
-
     text = "🧠 TAREFAS\n\n"
 
     for task in tasks:
 
         text += f"{task[0]}. {task[1]}\n"
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        text[:4000]
+    )
 
 # =========================================
 # MEMORY
@@ -401,14 +444,6 @@ async def generic_agent(update, context, role):
 
     prompt = " ".join(context.args)
 
-    if not prompt:
-
-        await update.message.reply_text(
-            "Digite algo."
-        )
-
-        return
-
     response = ask_ai(prompt, role)
 
     for i in range(0, len(response), 3900):
@@ -418,7 +453,7 @@ async def generic_agent(update, context, role):
         )
 
 # =========================================
-# MULTI AGENT
+# MULTI
 # =========================================
 
 async def completo(update, context):
@@ -440,7 +475,7 @@ async def completo(update, context):
         )
 
 # =========================================
-# IMAGE COMMANDS
+# IMAGES
 # =========================================
 
 async def imagem(update, context):
@@ -467,9 +502,8 @@ async def logo(update, context):
         photo=image_url(
             f"""
             futuristic luxury logo,
-            minimal,
             clean vector,
-            premium brand,
+            premium branding,
             {prompt}
             """
         )
@@ -634,6 +668,10 @@ color:white;
 cursor:pointer;
 }
 
+.upload{
+margin-top:10px;
+}
+
 </style>
 
 </head>
@@ -659,9 +697,9 @@ StreetCore AI Operating System
 <div class="chat" id="chat">
 
 <div class="msg ai">
-🔥 StreetCore OS V3 online.
+🔥 StreetCore OS V4 online.
 
-Sistema operacional IA iniciado.
+Upload de arquivos IA ativo.
 </div>
 
 </div>
@@ -675,6 +713,16 @@ placeholder="Digite sua ideia..."
 
 <button onclick="sendMessage()">
 Enviar
+</button>
+
+</div>
+
+<div class="upload">
+
+<input type="file" id="file">
+
+<button onclick="uploadFile()">
+Upload IA
 </button>
 
 </div>
@@ -729,6 +777,47 @@ chat.scrollHeight;
 
 }
 
+async function uploadFile(){
+
+const fileInput =
+document.getElementById("file");
+
+const file =
+fileInput.files[0];
+
+if(!file) return;
+
+const formData =
+new FormData();
+
+formData.append(
+"file",
+file
+);
+
+const response =
+await fetch("/upload",{
+
+method:"POST",
+body:formData
+
+});
+
+const data =
+await response.json();
+
+const chat =
+document.getElementById("chat");
+
+chat.innerHTML += `
+<div class="msg ai">${data.response}</div>
+`;
+
+chat.scrollTop =
+chat.scrollHeight;
+
+}
+
 </script>
 
 </body>
@@ -754,6 +843,58 @@ def ask_web():
         "response":response
     })
 
+@web.route("/upload", methods=["POST"])
+def upload():
+
+    if "file" not in request.files:
+
+        return jsonify({
+            "response":"Nenhum arquivo."
+        })
+
+    file = request.files["file"]
+
+    filename = secure_filename(file.filename)
+
+    path = os.path.join(
+        UPLOAD_FOLDER,
+        filename
+    )
+
+    file.save(path)
+
+    content = read_file(path)
+
+    cursor.execute(
+        "INSERT INTO files(filename,content) VALUES(?,?)",
+        (filename,content)
+    )
+
+    conn.commit()
+
+    analysis = ask_ai(
+f"""
+Analise este arquivo profundamente.
+
+Arquivo:
+{filename}
+
+Conteúdo:
+{content[:12000]}
+
+Crie:
+- resumo;
+- insights;
+- melhorias;
+- oportunidades;
+- análise estratégica.
+"""
+    )
+
+    return jsonify({
+        "response":analysis
+    })
+
 @web.route("/api/status")
 def api_status():
 
@@ -772,6 +913,11 @@ def api_status():
         "memory":
         cursor.execute(
             "SELECT COUNT(*) FROM memory"
+        ).fetchone()[0],
+
+        "files":
+        cursor.execute(
+            "SELECT COUNT(*) FROM files"
         ).fetchone()[0]
     })
 
@@ -841,6 +987,6 @@ threading.Thread(
     daemon=True
 ).start()
 
-print("🔥 STREETCORE OS V3 ONLINE")
+print("🔥 STREETCORE OS V4 ONLINE")
 
 app.run_polling()
