@@ -1,5 +1,4 @@
 import os
-import csv
 import sqlite3
 import threading
 import asyncio
@@ -9,11 +8,11 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v25-free")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v26-free")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 
-DB_PATH = "streetcore_v25.db"
+DB_PATH = "streetcore_v26.db"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -77,9 +76,39 @@ def iniciar_banco():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS metas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT,
+            valor TEXT,
+            status TEXT DEFAULT 'ativa',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS agenda (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titulo TEXT,
+            data TEXT,
+            status TEXT DEFAULT 'pendente',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS orcamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao TEXT,
+            valor REAL,
+            status TEXT DEFAULT 'aberto',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
-    print("✅ Banco V25 iniciado.")
+    print("✅ Banco V26 iniciado.")
 
 
 def login_required():
@@ -126,6 +155,50 @@ def financeiro():
     return receita, despesa, receita - despesa
 
 
+def contar_status_leads(status):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM leads WHERE status=?", (status,))
+    total = cur.fetchone()[0]
+    conn.close()
+    return total
+
+
+def listar_leads_status(status):
+    conn = db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, nome, origem, status, criado_em FROM leads WHERE status=? ORDER BY id DESC LIMIT 50",
+        (status,)
+    )
+    dados = cur.fetchall()
+    conn.close()
+    return dados
+
+
+def calcular_orcamento(descricao):
+    texto = descricao.lower()
+    base = 35
+
+    if "caneca" in texto:
+        base = 30
+    elif "adesivo" in texto:
+        base = 8
+    elif "panfleto" in texto:
+        base = 80
+    elif "brinde" in texto:
+        base = 20
+
+    quantidade = 1
+
+    for palavra in texto.split():
+        if palavra.isdigit():
+            quantidade = int(palavra)
+            break
+
+    return base * quantidade
+
+
 def gerar_post(tema):
     return (
         f"🔥 POST PRONTO - {tema.upper()}\n\n"
@@ -161,11 +234,34 @@ def gerar_campanha(tema):
     return f"{gerar_post(tema)}\n\n---\n\n{gerar_story(tema)}\n\n---\n\n{gerar_reels(tema)}"
 
 
+def relatorio_operacional():
+    receita, despesa, lucro = financeiro()
+
+    return (
+        "📊 RELATÓRIO OPERACIONAL V26\n\n"
+        f"Pedidos: {contar('pedidos')}\n"
+        f"Leads: {contar('leads')}\n"
+        f"Conteúdos: {contar('conteudos')}\n"
+        f"Metas: {contar('metas')}\n"
+        f"Agenda: {contar('agenda')}\n"
+        f"Orçamentos: {contar('orcamentos')}\n\n"
+        f"Receita: R$ {receita:.2f}\n"
+        f"Despesa: R$ {despesa:.2f}\n"
+        f"Lucro: R$ {lucro:.2f}\n\n"
+        "Decisão sugerida:\n"
+        "✅ gerar mais leads\n"
+        "✅ publicar reels\n"
+        "✅ atualizar status dos pedidos\n"
+        "✅ revisar orçamento aberto\n"
+        "✅ acompanhar lucro"
+    )
+
+
 def layout(conteudo):
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V25</title>
+        <title>StreetCore OS V26</title>
         <style>
             body {{
                 margin:0;
@@ -178,21 +274,22 @@ def layout(conteudo):
                 top:0;
                 left:0;
                 bottom:0;
-                width:240px;
+                width:250px;
                 background:#0b0b0b;
                 border-right:1px solid #222;
                 padding:24px;
+                overflow:auto;
             }}
             .sidebar h2 {{ color:#00ff88; }}
             .sidebar a {{
                 display:block;
                 color:white;
                 text-decoration:none;
-                margin:13px 0;
+                margin:12px 0;
             }}
             .sidebar a:hover {{ color:#00ff88; }}
             .main {{
-                margin-left:290px;
+                margin-left:300px;
                 padding:30px;
             }}
             .grid {{
@@ -200,12 +297,24 @@ def layout(conteudo):
                 grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
                 gap:18px;
             }}
+            .kanban {{
+                display:grid;
+                grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+                gap:15px;
+            }}
             .card {{
                 background:#111;
                 border:1px solid #333;
                 border-radius:18px;
                 padding:22px;
                 margin-bottom:18px;
+            }}
+            .lead-card {{
+                background:#171717;
+                border:1px solid #333;
+                border-radius:14px;
+                padding:14px;
+                margin-bottom:12px;
             }}
             .big {{
                 color:#00ff88;
@@ -249,17 +358,23 @@ def layout(conteudo):
                 border-radius:8px;
             }}
             a {{ color:#00ff88; }}
+            pre {{ white-space:pre-wrap; }}
         </style>
     </head>
     <body>
         <div class="sidebar">
             <h2>🔥 StreetCore</h2>
             <a href="/">Dashboard</a>
+            <a href="/kanban">Kanban CRM</a>
             <a href="/pedidos">Pedidos</a>
-            <a href="/leads">Leads / CRM</a>
+            <a href="/leads">Leads</a>
             <a href="/financeiro-web">Financeiro</a>
             <a href="/conteudo">Gerador IA</a>
-            <a href="/conteudos">Conteúdos salvos</a>
+            <a href="/conteudos">Conteúdos</a>
+            <a href="/metas">Metas</a>
+            <a href="/agenda">Agenda</a>
+            <a href="/orcamentos">Orçamentos</a>
+            <a href="/decisao">Painel de Decisão</a>
             <a href="/criar">Criar</a>
             <a href="/buscar">Buscar</a>
             <a href="/backup">Backup</a>
@@ -283,24 +398,18 @@ def home():
     receita, despesa, lucro = financeiro()
 
     conteudo = f"""
-    <h1>🔥 STREETCORE OS V25 MASTER</h1>
-    <p class="ok">Dashboard avançado com CRM, conteúdo, backup e exportação.</p>
+    <h1>🔥 STREETCORE OS V26 ULTRA PANEL</h1>
+    <p class="ok">Painel avançado com Kanban, metas, agenda, orçamentos e decisão.</p>
 
     <div class="grid">
         <div class="card"><h2>Pedidos</h2><div class="big">{contar("pedidos")}</div></div>
         <div class="card"><h2>Leads</h2><div class="big">{contar("leads")}</div></div>
         <div class="card"><h2>Conteúdos</h2><div class="big">{contar("conteudos")}</div></div>
+        <div class="card"><h2>Metas</h2><div class="big">{contar("metas")}</div></div>
+        <div class="card"><h2>Agenda</h2><div class="big">{contar("agenda")}</div></div>
+        <div class="card"><h2>Orçamentos</h2><div class="big">{contar("orcamentos")}</div></div>
         <div class="card"><h2>Receita</h2><div class="big">R$ {receita:.2f}</div></div>
-        <div class="card"><h2>Despesa</h2><div class="big">R$ {despesa:.2f}</div></div>
         <div class="card"><h2>Lucro</h2><div class="big">R$ {lucro:.2f}</div></div>
-    </div>
-
-    <div class="card">
-        <h2>Ações rápidas</h2>
-        <a href="/conteudo">Gerar conteúdo</a><br>
-        <a href="/criar">Criar pedido, lead, receita ou despesa</a><br>
-        <a href="/export/leads">Exportar leads CSV</a><br>
-        <a href="/export/pedidos">Exportar pedidos CSV</a>
     </div>
     """
 
@@ -326,7 +435,7 @@ def login():
     <body style="background:#050505;color:white;font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;">
         <div style="background:#111;padding:40px;border-radius:20px;border:1px solid #333;width:330px;">
             <h1>🔥 StreetCore</h1>
-            <p>V25 Master</p>
+            <p>V26 Ultra Panel</p>
             {erro}
             <form method="POST">
                 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:10px;border:0;">
@@ -349,7 +458,49 @@ def logout():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "online", "version": "StreetCore OS V25 Master"})
+    return jsonify({"status": "online", "version": "StreetCore OS V26 Ultra Panel"})
+
+
+@app.route("/kanban")
+def kanban():
+    if not login_required():
+        return redirect("/login")
+
+    status_list = ["novo", "contatado", "orcamento", "convertido"]
+
+    colunas = ""
+
+    for status in status_list:
+        leads = listar_leads_status(status)
+
+        cards = "".join([
+            f"""
+            <div class="lead-card">
+                <strong>#{l[0]} - {l[1]}</strong>
+                <p>Origem: {l[2]}</p>
+                <p>Status: {l[3]}</p>
+                <a href="/lead-status/{l[0]}/novo">Novo</a> |
+                <a href="/lead-status/{l[0]}/contatado">Contatado</a> |
+                <a href="/lead-status/{l[0]}/orcamento">Orçamento</a> |
+                <a href="/lead-status/{l[0]}/convertido">Convertido</a>
+            </div>
+            """
+            for l in leads
+        ])
+
+        colunas += f"""
+        <div class="card">
+            <h2>{status.upper()}</h2>
+            {cards}
+        </div>
+        """
+
+    return layout(f"""
+    <h1>🧩 Kanban CRM</h1>
+    <div class="kanban">
+        {colunas}
+    </div>
+    """)
 
 
 @app.route("/conteudo", methods=["GET", "POST"])
@@ -381,7 +532,7 @@ def conteudo_web():
         conn.commit()
         conn.close()
 
-    conteudo = f"""
+    return layout(f"""
     <h1>🤖 Gerador IA de Conteúdo</h1>
 
     <div class="card">
@@ -405,9 +556,7 @@ def conteudo_web():
         <h2>Resultado</h2>
         <textarea>{resultado}</textarea>
     </div>
-    """
-
-    return layout(conteudo)
+    """)
 
 
 @app.route("/conteudos")
@@ -462,6 +611,19 @@ def criar_web():
             cur.execute("INSERT INTO financeiro (tipo, valor, descricao) VALUES (?, ?, ?)", ("despesa", float(valor), nome))
             mensagem = "Despesa adicionada."
 
+        elif tipo == "meta":
+            cur.execute("INSERT INTO metas (nome, valor) VALUES (?, ?)", (nome, valor))
+            mensagem = "Meta criada."
+
+        elif tipo == "agenda":
+            cur.execute("INSERT INTO agenda (titulo, data) VALUES (?, ?)", (nome, valor))
+            mensagem = "Evento criado."
+
+        elif tipo == "orcamento":
+            valor_calc = calcular_orcamento(nome)
+            cur.execute("INSERT INTO orcamentos (descricao, valor) VALUES (?, ?)", (nome, valor_calc))
+            mensagem = f"Orçamento criado: R$ {valor_calc:.2f}"
+
         conn.commit()
         conn.close()
         salvar_log(f"Ação web: {tipo} - {nome}")
@@ -477,13 +639,16 @@ def criar_web():
                 <option value="lead">Lead</option>
                 <option value="receita">Receita</option>
                 <option value="despesa">Despesa</option>
+                <option value="meta">Meta</option>
+                <option value="agenda">Agenda</option>
+                <option value="orcamento">Orçamento</option>
             </select>
 
             <label>Nome/Descrição</label>
             <input name="nome" placeholder="Ex: camiseta personalizada">
 
-            <label>Valor, se for financeiro</label>
-            <input name="valor" placeholder="Ex: 100">
+            <label>Valor/Data</label>
+            <input name="valor" placeholder="Ex: 100 ou 20/05 14h">
 
             <button>Criar</button>
         </form>
@@ -564,7 +729,7 @@ def leads_page():
     ])
 
     return layout(f"""
-    <h1>🎯 Leads / CRM</h1>
+    <h1>🎯 Leads</h1>
     <a href="/export/leads">Exportar CSV</a><br><br>
     <table>
         <tr><th>ID</th><th>Nome</th><th>Origem</th><th>Status</th><th>Data</th><th>Ações</th></tr>
@@ -584,7 +749,7 @@ def lead_status(lead_id, status):
     conn.commit()
     conn.close()
 
-    return redirect("/leads")
+    return redirect("/kanban")
 
 
 @app.route("/financeiro-web")
@@ -600,6 +765,84 @@ def financeiro_web():
         <div class="card"><h2>Receita</h2><div class="big">R$ {receita:.2f}</div></div>
         <div class="card"><h2>Despesa</h2><div class="big">R$ {despesa:.2f}</div></div>
         <div class="card"><h2>Lucro</h2><div class="big">R$ {lucro:.2f}</div></div>
+    </div>
+    """)
+
+
+@app.route("/metas")
+def metas_page():
+    if not login_required():
+        return redirect("/login")
+
+    dados = listar("metas")
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    return layout(f"""
+    <h1>🎯 Metas</h1>
+    <table>
+        <tr><th>ID</th><th>Meta</th><th>Valor</th><th>Status</th><th>Data</th></tr>
+        {linhas}
+    </table>
+    """)
+
+
+@app.route("/agenda")
+def agenda_page():
+    if not login_required():
+        return redirect("/login")
+
+    dados = listar("agenda")
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    return layout(f"""
+    <h1>📅 Agenda</h1>
+    <table>
+        <tr><th>ID</th><th>Título</th><th>Data</th><th>Status</th><th>Criado</th></tr>
+        {linhas}
+    </table>
+    """)
+
+
+@app.route("/orcamentos")
+def orcamentos_page():
+    if not login_required():
+        return redirect("/login")
+
+    dados = listar("orcamentos")
+
+    linhas = "".join([
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>R$ {d[2]:.2f}</td><td>{d[3]}</td><td>{d[4]}</td></tr>"
+        for d in dados
+    ])
+
+    return layout(f"""
+    <h1>🧾 Orçamentos</h1>
+    <table>
+        <tr><th>ID</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Data</th></tr>
+        {linhas}
+    </table>
+    """)
+
+
+@app.route("/decisao")
+def decisao_page():
+    if not login_required():
+        return redirect("/login")
+
+    relatorio = relatorio_operacional()
+
+    return layout(f"""
+    <h1>🧠 Painel de Decisão</h1>
+    <div class="card">
+        <pre>{relatorio}</pre>
     </div>
     """)
 
@@ -643,7 +886,7 @@ def backup_page():
     if not login_required():
         return redirect("/login")
 
-    nome = f"backup_v25_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    nome = f"backup_v26_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
 
     with open(DB_PATH, "rb") as origem:
         conteudo = origem.read()
@@ -660,7 +903,7 @@ def export_csv(tabela):
     if not login_required():
         return redirect("/login")
 
-    if tabela not in ["pedidos", "leads", "financeiro", "conteudos"]:
+    if tabela not in ["pedidos", "leads", "financeiro", "conteudos", "metas", "agenda", "orcamentos"]:
         return "Tabela não permitida."
 
     conn = db()
@@ -698,7 +941,7 @@ def logs_page():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V25 MASTER\n\n"
+        "🔥 STREETCORE OS V26 ULTRA PANEL\n\n"
         "/pedido camiseta personalizada\n"
         "/pedidos\n"
         "/pedido_status 1 finalizado\n"
@@ -708,6 +951,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/receita 100\n"
         "/despesa 50\n"
         "/financeiro\n"
+        "/meta vender_1000 1000\n"
+        "/metas\n"
+        "/agenda reunião 20/05\n"
+        "/agendas\n"
+        "/orcamento 10 camisetas\n"
+        "/orcamentos\n"
+        "/relatorio\n"
         "/post camisetas\n"
         "/story adesivos\n"
         "/reels canecas\n"
@@ -717,7 +967,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ StreetCore OS V25 online.")
+    await update.message.reply_text("✅ StreetCore OS V26 online.")
 
 
 async def pedido(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -825,6 +1075,74 @@ async def financeiro_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"💵 FINANCEIRO\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}")
 
 
+async def meta_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /meta vender_1000 1000")
+        return
+
+    nome = context.args[0]
+    valor = " ".join(context.args[1:])
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO metas (nome, valor) VALUES (?, ?)", (nome, valor))
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text("🎯 Meta criada.")
+
+
+async def metas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(str(listar("metas")))
+
+
+async def agenda_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /agenda reunião 20/05")
+        return
+
+    titulo = context.args[0]
+    data = " ".join(context.args[1:])
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO agenda (titulo, data) VALUES (?, ?)", (titulo, data))
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text("📅 Evento criado.")
+
+
+async def agendas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(str(listar("agenda")))
+
+
+async def orcamento_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    descricao = " ".join(context.args)
+
+    if not descricao:
+        await update.message.reply_text("Use assim: /orcamento 10 camisetas")
+        return
+
+    valor = calcular_orcamento(descricao)
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO orcamentos (descricao, valor) VALUES (?, ?)", (descricao, valor))
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(f"🧾 Orçamento criado: R$ {valor:.2f}")
+
+
+async def orcamentos_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(str(listar("orcamentos")))
+
+
+async def relatorio_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(relatorio_operacional())
+
+
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_post(" ".join(context.args) or "Street Graff"))
 
@@ -843,7 +1161,7 @@ async def campanha(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     salvar_log(update.message.text)
-    await update.message.reply_text("🤖 StreetCore IA V25 recebeu. Use /start.")
+    await update.message.reply_text("🤖 StreetCore IA V26 recebeu. Use /start.")
 
 
 async def telegram_main():
@@ -860,17 +1178,24 @@ async def telegram_main():
     bot.add_handler(CommandHandler("receita", receita))
     bot.add_handler(CommandHandler("despesa", despesa))
     bot.add_handler(CommandHandler("financeiro", financeiro_cmd))
+    bot.add_handler(CommandHandler("meta", meta_cmd))
+    bot.add_handler(CommandHandler("metas", metas_cmd))
+    bot.add_handler(CommandHandler("agenda", agenda_cmd))
+    bot.add_handler(CommandHandler("agendas", agendas_cmd))
+    bot.add_handler(CommandHandler("orcamento", orcamento_cmd))
+    bot.add_handler(CommandHandler("orcamentos", orcamentos_cmd))
+    bot.add_handler(CommandHandler("relatorio", relatorio_cmd))
     bot.add_handler(CommandHandler("post", post))
     bot.add_handler(CommandHandler("story", story))
     bot.add_handler(CommandHandler("reels", reels))
     bot.add_handler(CommandHandler("campanha", campanha))
     bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V25...")
+    print("🔥 Telegram iniciando V26...")
     await bot.initialize()
     await bot.start()
     await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V25")
+    print("✅ Telegram ONLINE V26")
 
     await asyncio.Event().wait()
 
