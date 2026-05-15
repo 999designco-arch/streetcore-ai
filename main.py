@@ -3,13 +3,28 @@ import json
 import urllib.parse
 from datetime import datetime
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
+
 from groq import Groq
+
+# ====================================
+# CONFIG
+# ====================================
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 client = Groq(api_key=GROQ_API_KEY)
+
+# ====================================
+# FILES
+# ====================================
 
 MEMORY_FILE = "memory.json"
 PROJECTS_FILE = "projects.json"
@@ -18,29 +33,58 @@ ROADMAPS_FILE = "roadmaps.json"
 DAILY_FILE = "daily.json"
 AUTOMATIONS_FILE = "automations.json"
 
+# ====================================
+# MASTER PROMPT
+# ====================================
+
 MASTER_PROMPT = """
 Você é StreetCore AI.
 
-Você é um agente executivo, criativo, estratégico, técnico e operacional.
+Um agente executivo, estratégico,
+criativo, técnico e operacional.
 
-Regras obrigatórias:
+Você atua como:
+- CEO;
+- COO;
+- estrategista;
+- engenheiro de automação;
+- branding expert;
+- growth hacker;
+- operador pessoal.
+
+REGRAS:
 - responda sempre em português;
-- use apenas ferramentas gratuitas ou plano grátis como padrão;
-- explique como se estivesse pegando na mão do usuário;
-- entregue execução prática;
-- pense como CEO, COO, engenheiro de automação, programador e diretor criativo;
-- nunca sugira ferramentas pagas como primeira opção.
+- use apenas ferramentas gratuitas;
+- explique passo a passo;
+- aja como parceiro operacional;
+- pense em automação, branding e escala.
 """
 
+# ====================================
+# JSON SYSTEM
+# ====================================
+
 def load_json(file, default):
+
     if not os.path.exists(file):
         return default
+
     with open(file, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_json(file, data):
+
     with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+
+# ====================================
+# MEMORY
+# ====================================
 
 def load_memory():
     return load_json(MEMORY_FILE, {})
@@ -49,24 +93,78 @@ def save_memory(memory):
     save_json(MEMORY_FILE, memory)
 
 def auto_memory(user_message, memory):
+
     text = user_message.lower()
 
     try:
+
         if "meu nome é" in text:
-            memory["nome"] = text.split("meu nome é")[1].strip()
+            memory["nome"] = text.split(
+                "meu nome é"
+            )[1].strip()
+
         if "quero criar" in text:
-            memory["objetivo"] = text.split("quero criar")[1].strip()
+            memory["objetivo"] = text.split(
+                "quero criar"
+            )[1].strip()
+
         if "minha marca é" in text:
-            memory["marca"] = text.split("minha marca é")[1].strip()
+            memory["marca"] = text.split(
+                "minha marca é"
+            )[1].strip()
+
         if "meu nicho é" in text:
-            memory["nicho"] = text.split("meu nicho é")[1].strip()
+            memory["nicho"] = text.split(
+                "meu nicho é"
+            )[1].strip()
+
     except:
         pass
 
-    memory["ultima_interacao"] = str(datetime.now())
+    memory["ultima_interacao"] = str(
+        datetime.now()
+    )
+
     save_memory(memory)
 
+# ====================================
+# AI SYSTEM
+# ====================================
+
+def ask_ai(prompt, memory=None):
+
+    memory_text = json.dumps(
+        memory or {},
+        ensure_ascii=False,
+        indent=2
+    )
+
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content":
+                MASTER_PROMPT +
+                f"\n\nMEMÓRIA:\n{memory_text}"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0.8,
+        max_tokens=3000
+    )
+
+    return completion.choices[0].message.content
+
+# ====================================
+# IMAGE SYSTEM
+# ====================================
+
 def gerar_imagem_url(prompt):
+
     premium_prompt = f"""
 ultra realistic cinematic image,
 street luxury futuristic aesthetic,
@@ -77,32 +175,21 @@ highly detailed.
 
 {prompt}
 """
-    encoded = urllib.parse.quote(premium_prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed=77"
 
-def ask_ai(prompt, memory=None, max_tokens=3000):
-    memory_text = json.dumps(memory or {}, ensure_ascii=False, indent=2)
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT + f"\n\nMEMÓRIA:\n{memory_text}"
-            },
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.8,
-        max_tokens=max_tokens
+    encoded = urllib.parse.quote(
+        premium_prompt
     )
 
-    return completion.choices[0].message.content
+    return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed=77"
+
+# ====================================
+# START
+# ====================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("""
-🔥 STREETCORE AI ONLINE
 
-AGENTE OPERACIONAL + AUTOMAÇÃO GRÁTIS
+    text = """
+🔥 STREETCORE AI ONLINE
 
 COMANDOS:
 
@@ -119,6 +206,7 @@ COMANDOS:
 
 /roadmap
 /roadmaps
+
 /hoje
 /semana
 
@@ -129,429 +217,549 @@ COMANDOS:
 /fluxo
 /script
 /checklist
-/automações
-""")
+/automacoes
+"""
+
+    await update.message.reply_text(text)
+
+# ====================================
+# STATUS
+# ====================================
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    memory = load_memory()
-    projects = load_json(PROJECTS_FILE, [])
-    tasks = load_json(TASKS_FILE, [])
-    roadmaps = load_json(ROADMAPS_FILE, [])
-    automations = load_json(AUTOMATIONS_FILE, [])
 
-    pendentes = len([t for t in tasks if t.get("status") == "pendente"])
-    concluidas = len([t for t in tasks if t.get("status") == "concluída"])
+    memory = load_memory()
+
+    projects = load_json(
+        PROJECTS_FILE,
+        []
+    )
+
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
+
+    roadmaps = load_json(
+        ROADMAPS_FILE,
+        []
+    )
+
+    automations = load_json(
+        AUTOMATIONS_FILE,
+        []
+    )
 
     await update.message.reply_text(f"""
 🚀 STATUS
 
 Sistema: ONLINE
-IA: Groq grátis
-Imagem: Pollinations grátis
-Memória: {len(memory)} itens
+Memória: {len(memory)}
 Projetos: {len(projects)}
-Tarefas pendentes: {pendentes}
-Tarefas concluídas: {concluidas}
+Tarefas: {len(tasks)}
 Roadmaps: {len(roadmaps)}
 Automações: {len(automations)}
-Modo: CEO + COO + AUTOMAÇÃO GRÁTIS
+
+Modo:
+CEO + COO + AUTOMAÇÃO
 """)
 
+# ====================================
+# MEMORY
+# ====================================
+
 async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     memory = load_memory()
 
     if not memory:
-        await update.message.reply_text("Nenhuma memória salva.")
+        await update.message.reply_text(
+            "Nenhuma memória salva."
+        )
         return
 
     text = "🧠 MEMÓRIAS:\n\n"
+
     for key, value in memory.items():
         text += f"• {key}: {value}\n"
 
     await update.message.reply_text(text)
 
+# ====================================
+# PROJECTS
+# ====================================
+
 async def projeto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     nome = " ".join(context.args)
 
     if not nome:
-        await update.message.reply_text("Use:\n/projeto nome do projeto")
+        await update.message.reply_text(
+            "Use:\n/projeto nome"
+        )
         return
 
-    projects = load_json(PROJECTS_FILE, [])
-    projects.append({"nome": nome, "data": str(datetime.now())})
-    save_json(PROJECTS_FILE, projects)
+    projects = load_json(
+        PROJECTS_FILE,
+        []
+    )
 
-    await update.message.reply_text(f"✅ Projeto criado:\n{nome}")
+    projects.append({
+        "nome": nome,
+        "data": str(datetime.now())
+    })
+
+    save_json(
+        PROJECTS_FILE,
+        projects
+    )
+
+    await update.message.reply_text(
+        f"✅ Projeto criado:\n{nome}"
+    )
 
 async def projetos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    projects = load_json(PROJECTS_FILE, [])
+
+    projects = load_json(
+        PROJECTS_FILE,
+        []
+    )
 
     if not projects:
-        await update.message.reply_text("Nenhum projeto criado.")
+        await update.message.reply_text(
+            "Nenhum projeto."
+        )
         return
 
     text = "📁 PROJETOS:\n\n"
+
     for i, p in enumerate(projects, start=1):
         text += f"{i}. {p['nome']}\n"
 
     await update.message.reply_text(text)
 
+# ====================================
+# TASKS
+# ====================================
+
 async def tarefa(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     nome = " ".join(context.args)
 
     if not nome:
-        await update.message.reply_text("Use:\n/tarefa descrição da tarefa")
+        await update.message.reply_text(
+            "Use:\n/tarefa descrição"
+        )
         return
 
-    tasks = load_json(TASKS_FILE, [])
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
+
     tasks.append({
         "tarefa": nome,
         "status": "pendente",
         "data": str(datetime.now())
     })
-    save_json(TASKS_FILE, tasks)
 
-    await update.message.reply_text(f"✅ Tarefa criada:\n{nome}")
+    save_json(
+        TASKS_FILE,
+        tasks
+    )
+
+    await update.message.reply_text(
+        f"✅ Tarefa criada:\n{nome}"
+    )
 
 async def tarefas(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tasks = load_json(TASKS_FILE, [])
+
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
 
     if not tasks:
-        await update.message.reply_text("Nenhuma tarefa criada.")
+        await update.message.reply_text(
+            "Nenhuma tarefa."
+        )
         return
 
-    text = "📝 TODAS AS TAREFAS:\n\n"
+    text = "📝 TAREFAS:\n\n"
+
     for i, t in enumerate(tasks, start=1):
         text += f"{i}. {t['tarefa']} — {t['status']}\n"
 
     await update.message.reply_text(text)
 
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tasks = load_json(TASKS_FILE, [])
-    pendentes = [(i, t) for i, t in enumerate(tasks, start=1) if t.get("status") == "pendente"]
+
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
+
+    pendentes = [
+        (i, t)
+        for i, t in enumerate(tasks, start=1)
+        if t["status"] == "pendente"
+    ]
 
     if not pendentes:
-        await update.message.reply_text("🔥 Nenhuma tarefa pendente.")
+        await update.message.reply_text(
+            "🔥 Nenhuma pendência."
+        )
         return
 
-    text = "⚠️ TAREFAS PENDENTES:\n\n"
+    text = "⚠️ PENDENTES:\n\n"
+
     for i, t in pendentes:
         text += f"{i}. {t['tarefa']}\n"
 
-    text += "\nPara concluir:\n/concluir número"
+    text += "\n/concluir número"
+
     await update.message.reply_text(text)
 
 async def concluir(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if not context.args:
-        await update.message.reply_text("Use:\n/concluir número_da_tarefa")
+        await update.message.reply_text(
+            "Use:\n/concluir número"
+        )
         return
 
     try:
         numero = int(context.args[0])
+
     except:
-        await update.message.reply_text("Digite um número válido. Exemplo:\n/concluir 1")
+        await update.message.reply_text(
+            "Número inválido."
+        )
         return
 
-    tasks = load_json(TASKS_FILE, [])
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
 
     if numero < 1 or numero > len(tasks):
-        await update.message.reply_text("Essa tarefa não existe.")
+        await update.message.reply_text(
+            "Tarefa inexistente."
+        )
         return
 
     tasks[numero - 1]["status"] = "concluída"
-    tasks[numero - 1]["concluida_em"] = str(datetime.now())
 
-    save_json(TASKS_FILE, tasks)
+    save_json(
+        TASKS_FILE,
+        tasks
+    )
 
-    await update.message.reply_text(f"✅ Tarefa concluída:\n{tasks[numero - 1]['tarefa']}")
+    await update.message.reply_text(
+        "✅ Tarefa concluída."
+    )
+
+# ====================================
+# ROADMAP
+# ====================================
 
 async def roadmap(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     objetivo = " ".join(context.args)
 
     if not objetivo:
-        await update.message.reply_text("Use:\n/roadmap seu objetivo")
+        await update.message.reply_text(
+            "Use:\n/roadmap objetivo"
+        )
         return
 
-    await update.message.reply_text("🧠 Criando roadmap estratégico completo...")
+    await update.message.reply_text(
+        "🧠 Criando roadmap..."
+    )
 
-    memory = load_memory()
-
-    prompt = f"""
-Crie um ROADMAP EXECUTIVO completo para:
+    resposta = ask_ai(f"""
+Crie um roadmap executivo completo para:
 
 {objetivo}
 
 Inclua:
-1. Visão geral
-2. Estratégia principal
-3. Etapas essenciais
-4. Plano de 7 dias
-5. Plano de 30 dias
-6. Tarefas prioritárias
-7. Ferramentas gratuitas
-8. Monetização
-9. Riscos
-10. Próximo passo imediato
-"""
+- estratégia;
+- execução;
+- monetização;
+- ferramentas grátis;
+- plano de 7 dias;
+- plano de 30 dias.
+""")
 
-    resposta = ask_ai(prompt, memory)
+    roadmaps = load_json(
+        ROADMAPS_FILE,
+        []
+    )
 
-    roadmaps = load_json(ROADMAPS_FILE, [])
-    roadmaps.append({"objetivo": objetivo, "roadmap": resposta, "data": str(datetime.now())})
-    save_json(ROADMAPS_FILE, roadmaps)
+    roadmaps.append({
+        "objetivo": objetivo,
+        "conteudo": resposta
+    })
+
+    save_json(
+        ROADMAPS_FILE,
+        roadmaps
+    )
 
     await update.message.reply_text(resposta)
 
 async def roadmaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    roadmaps_list = load_json(ROADMAPS_FILE, [])
+
+    roadmaps_list = load_json(
+        ROADMAPS_FILE,
+        []
+    )
 
     if not roadmaps_list:
-        await update.message.reply_text("Nenhum roadmap criado.")
+        await update.message.reply_text(
+            "Nenhum roadmap."
+        )
         return
 
-    text = "🗺 ROADMAPS SALVOS:\n\n"
-    for i, r in enumerate(roadmaps_list, start=1):
+    text = "🗺 ROADMAPS:\n\n"
+
+    for i, r in enumerate(
+        roadmaps_list,
+        start=1
+    ):
         text += f"{i}. {r['objetivo']}\n"
 
     await update.message.reply_text(text)
 
+# ====================================
+# DAILY
+# ====================================
+
 async def hoje(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    memory = load_memory()
-    tasks = load_json(TASKS_FILE, [])
-    projects = load_json(PROJECTS_FILE, [])
 
-    pendentes = [t["tarefa"] for t in tasks if t.get("status") == "pendente"]
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
 
-    prompt = f"""
-Crie um PLANO DE EXECUÇÃO PARA HOJE.
+    resposta = ask_ai(f"""
+Crie um plano executivo para hoje.
 
-Projetos: {projects}
-Tarefas pendentes: {pendentes}
-
-Inclua:
-1. Prioridade do dia
-2. 3 tarefas mais importantes
-3. Ordem exata
-4. O que evitar
-5. Plano de foco de 2 horas
-6. Próximo passo
-"""
-
-    resposta = ask_ai(prompt, memory)
-    daily = load_json(DAILY_FILE, [])
-    daily.append({"tipo": "hoje", "plano": resposta, "data": str(datetime.now())})
-    save_json(DAILY_FILE, daily)
+Tarefas:
+{tasks}
+""")
 
     await update.message.reply_text(resposta)
 
 async def semana(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    memory = load_memory()
-    tasks = load_json(TASKS_FILE, [])
-    projects = load_json(PROJECTS_FILE, [])
 
-    prompt = f"""
-Crie um PLANO SEMANAL EXECUTIVO.
+    tasks = load_json(
+        TASKS_FILE,
+        []
+    )
 
-Projetos: {projects}
-Tarefas: {tasks}
+    resposta = ask_ai(f"""
+Crie um plano semanal executivo.
 
-Inclua:
-1. Meta principal
-2. Segunda a domingo
-3. Tarefas por dia
-4. Entregáveis
-5. Ferramentas gratuitas
-6. Riscos
-7. Próximo passo
-"""
-
-    resposta = ask_ai(prompt, memory)
-    daily = load_json(DAILY_FILE, [])
-    daily.append({"tipo": "semana", "plano": resposta, "data": str(datetime.now())})
-    save_json(DAILY_FILE, daily)
+Tarefas:
+{tasks}
+""")
 
     await update.message.reply_text(resposta)
 
+# ====================================
+# IMAGE
+# ====================================
+
 async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     prompt = " ".join(context.args)
 
     if not prompt:
-        await update.message.reply_text("Use:\n/imagem descrição")
+        await update.message.reply_text(
+            "Use:\n/imagem descrição"
+        )
         return
 
-    await update.message.reply_text("🎨 Gerando imagem gratuita...")
-    await update.message.reply_photo(photo=gerar_imagem_url(prompt))
+    await update.message.reply_text(
+        "🎨 Gerando imagem..."
+    )
+
+    await update.message.reply_photo(
+        photo=gerar_imagem_url(prompt)
+    )
 
 async def logo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     prompt = " ".join(context.args)
 
     if not prompt:
-        await update.message.reply_text("Use:\n/logo nome da marca")
+        await update.message.reply_text(
+            "Use:\n/logo marca"
+        )
         return
 
-    await update.message.reply_text("🔥 Criando logo gratuita...")
-
     logo_prompt = f"""
-minimal futuristic luxury logo,
-clean branding,
-premium streetwear identity,
-white background,
-professional logo design.
+minimal futuristic logo,
+luxury branding,
+streetwear premium.
 
 {prompt}
 """
 
-    await update.message.reply_photo(photo=gerar_imagem_url(logo_prompt))
+    await update.message.reply_text(
+        "🔥 Criando logo..."
+    )
+
+    await update.message.reply_photo(
+        photo=gerar_imagem_url(
+            logo_prompt
+        )
+    )
+
+# ====================================
+# AUTOMATION
+# ====================================
 
 async def automacao(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     objetivo = " ".join(context.args)
 
     if not objetivo:
-        await update.message.reply_text("Use:\n/automacao o que você quer automatizar")
+        await update.message.reply_text(
+            "Use:\n/automacao objetivo"
+        )
         return
 
-    await update.message.reply_text("⚙️ Criando automação gratuita...")
+    resposta = ask_ai(f"""
+Crie uma automação gratuita para:
 
-    memory = load_memory()
-
-    prompt = f"""
-Crie uma AUTOMAÇÃO usando apenas ferramentas gratuitas/plano grátis.
-
-Objetivo:
 {objetivo}
 
-Estruture:
-1. O que será automatizado
-2. Ferramentas gratuitas indicadas
-3. Fluxo passo a passo
-4. Entrada de dados
-5. Processamento
-6. Saída final
-7. Como testar
-8. Possíveis erros
-9. Como corrigir
-10. Próximo passo simples para iniciante
-"""
+Inclua:
+- ferramentas grátis;
+- passo a passo;
+- fluxo;
+- execução;
+- erros comuns.
+""")
 
-    resposta = ask_ai(prompt, memory)
+    automations = load_json(
+        AUTOMATIONS_FILE,
+        []
+    )
 
-    automations = load_json(AUTOMATIONS_FILE, [])
     automations.append({
-        "tipo": "automacao",
         "objetivo": objetivo,
-        "conteudo": resposta,
-        "data": str(datetime.now())
+        "conteudo": resposta
     })
-    save_json(AUTOMATIONS_FILE, automations)
+
+    save_json(
+        AUTOMATIONS_FILE,
+        automations
+    )
 
     await update.message.reply_text(resposta)
 
 async def fluxo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     objetivo = " ".join(context.args)
 
-    if not objetivo:
-        await update.message.reply_text("Use:\n/fluxo descreva o fluxo")
-        return
-
-    await update.message.reply_text("🧩 Criando fluxo operacional...")
-
-    prompt = f"""
-Desenhe um fluxo operacional gratuito para:
+    resposta = ask_ai(f"""
+Crie um fluxo operacional gratuito para:
 
 {objetivo}
 
 Formato:
 INÍCIO →
-ETAPA 1 →
-ETAPA 2 →
-ETAPA 3 →
-SAÍDA FINAL
+ETAPA →
+ETAPA →
+FINAL
+""")
 
-Depois explique cada etapa como para iniciante.
-Inclua versão para n8n gratuito quando possível.
-"""
-
-    resposta = ask_ai(prompt, load_memory())
     await update.message.reply_text(resposta)
 
 async def script(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     objetivo = " ".join(context.args)
 
-    if not objetivo:
-        await update.message.reply_text("Use:\n/script o que o script deve fazer")
-        return
-
-    await update.message.reply_text("💻 Criando script gratuito...")
-
-    prompt = f"""
-Crie um script simples e gratuito para:
+    resposta = ask_ai(f"""
+Crie um script Python gratuito para:
 
 {objetivo}
 
-Regras:
-- linguagem preferida: Python
-- explique onde colar
-- explique como rodar
-- inclua código completo
-- seja amigável para iniciante
-- não use ferramentas pagas
-"""
+Inclua:
+- código completo;
+- como rodar;
+- explicação simples.
+""")
 
-    resposta = ask_ai(prompt, load_memory())
     await update.message.reply_text(resposta)
 
 async def checklist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     objetivo = " ".join(context.args)
 
-    if not objetivo:
-        await update.message.reply_text("Use:\n/checklist objetivo")
-        return
-
-    prompt = f"""
-Crie um checklist operacional completo para:
+    resposta = ask_ai(f"""
+Crie um checklist operacional para:
 
 {objetivo}
+""")
 
-Formato:
-✅ item
-✅ item
-✅ item
-
-Divida em:
-1. Preparação
-2. Execução
-3. Revisão
-4. Automação gratuita possível
-5. Próximo passo
-"""
-
-    resposta = ask_ai(prompt, load_memory())
     await update.message.reply_text(resposta)
 
 async def automacoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    automations = load_json(AUTOMATIONS_FILE, [])
+
+    automations = load_json(
+        AUTOMATIONS_FILE,
+        []
+    )
 
     if not automations:
-        await update.message.reply_text("Nenhuma automação salva.")
+        await update.message.reply_text(
+            "Nenhuma automação."
+        )
         return
 
-    text = "⚙️ AUTOMAÇÕES SALVAS:\n\n"
-    for i, a in enumerate(automations, start=1):
+    text = "⚙️ AUTOMAÇÕES:\n\n"
+
+    for i, a in enumerate(
+        automations,
+        start=1
+    ):
         text += f"{i}. {a['objetivo']}\n"
 
     await update.message.reply_text(text)
 
+# ====================================
+# CHAT
+# ====================================
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_message = update.message.text
 
     memory = load_memory()
-    auto_memory(user_message, memory)
 
-    reply = ask_ai(user_message, memory)
+    auto_memory(
+        user_message,
+        memory
+    )
 
-    await update.message.reply_text(reply)
+    resposta = ask_ai(
+        user_message,
+        memory
+    )
 
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    await update.message.reply_text(resposta)
+
+# ====================================
+# APP
+# ====================================
+
+app = ApplicationBuilder().token(
+    TELEGRAM_TOKEN
+).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("status", status))
@@ -562,6 +770,7 @@ app.add_handler(CommandHandler("projetos", projetos))
 
 app.add_handler(CommandHandler("tarefa", tarefa))
 app.add_handler(CommandHandler("tarefas", tarefas))
+
 app.add_handler(CommandHandler("check", check))
 app.add_handler(CommandHandler("concluir", concluir))
 
@@ -578,9 +787,15 @@ app.add_handler(CommandHandler("automacao", automacao))
 app.add_handler(CommandHandler("fluxo", fluxo))
 app.add_handler(CommandHandler("script", script))
 app.add_handler(CommandHandler("checklist", checklist))
-app.add_handler(CommandHandler("automações", automacoes))
+app.add_handler(CommandHandler("automacoes", automacoes))
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_message
+    )
+)
 
-print("🔥 STREETCORE AI AUTOMATION MODE ONLINE")
+print("🔥 STREETCORE AI ONLINE")
+
 app.run_polling()
