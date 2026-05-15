@@ -11,13 +11,11 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 8080))
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "streetcore123")
-
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 client = Groq(api_key=GROQ_API_KEY)
-
-conn = sqlite3.connect("streetcore_v10.db", check_same_thread=False)
+conn = sqlite3.connect("streetcore_v11.db", check_same_thread=False)
 cursor = conn.cursor()
 
 TABLES = [
@@ -37,7 +35,10 @@ TABLES = [
 "CREATE TABLE IF NOT EXISTS content_calendar(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,title TEXT,platform TEXT,publish_date TEXT,status TEXT,created_at TEXT)",
 "CREATE TABLE IF NOT EXISTS pages(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,type TEXT,title TEXT,html TEXT,created_at TEXT)",
 "CREATE TABLE IF NOT EXISTS automations(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,name TEXT,action TEXT,schedule_text TEXT,status TEXT,last_run TEXT,created_at TEXT)",
-"CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,type TEXT,message TEXT,created_at TEXT)"
+"CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,type TEXT,message TEXT,created_at TEXT)",
+"CREATE TABLE IF NOT EXISTS custom_agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,name TEXT,description TEXT,system_prompt TEXT,created_at TEXT)",
+"CREATE TABLE IF NOT EXISTS templates(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,type TEXT,name TEXT,description TEXT,payload TEXT,created_at TEXT)",
+"CREATE TABLE IF NOT EXISTS marketplace(id INTEGER PRIMARY KEY AUTOINCREMENT,type TEXT,name TEXT,description TEXT,payload TEXT,created_at TEXT)"
 ]
 
 for t in TABLES:
@@ -59,17 +60,34 @@ def ensure_admin():
         )
         conn.commit()
 
+def seed_marketplace():
+    total = cursor.execute("SELECT COUNT(*) FROM marketplace").fetchone()[0]
+    if total > 0:
+        return
+    seeds = [
+        ("business", "Agência de Automação IA", "Modelo de negócio para vender automações com IA.", "Crie uma agência de automação IA com oferta, funil, serviços, pricing e plano de 30 dias."),
+        ("business", "SaaS Micro Nicho", "Template para criar SaaS simples e vendável.", "Crie um SaaS de micro nicho com MVP, stack grátis, landing, pricing e roadmap."),
+        ("content", "30 Posts Instagram", "Calendário de 30 posts.", "Crie 30 posts para Instagram com gancho, legenda, CTA, hashtag e ideia visual."),
+        ("landing", "Landing Page Premium", "Página de vendas simples e forte.", "Crie uma landing page com headline, promessa, seções, prova, oferta e CTA."),
+        ("workflow", "Workflow Conteúdo Diário", "Rotina automática de produção de conteúdo.", "Crie workflow diário de conteúdo com ideação, roteiro, imagem, legenda, revisão e publicação segura."),
+        ("agent", "Closer IA", "Agente vendedor para WhatsApp e propostas.", "Você é um closer IA. Foque em objeções, proposta, follow-up e fechamento."),
+        ("agent", "Diretor Criativo IA", "Agente de branding e campanhas.", "Você é um diretor criativo premium. Foque em estética, campanha, conceito e diferenciação.")
+    ]
+    for s in seeds:
+        cursor.execute("INSERT INTO marketplace(type,name,description,payload,created_at) VALUES(?,?,?,?,?)", (*s, now()))
+    conn.commit()
+
 ensure_admin()
+seed_marketplace()
 
 MASTER_PROMPT = """
-Você é StreetCore OS V10 — AI Company Operating System.
+Você é StreetCore OS V11 — AI Company Operating System.
 Responda sempre em português.
 Use ferramentas gratuitas ou plano grátis como padrão.
 Aja como CEO, CMO, CTO, diretor criativo, growth hacker, engenheiro de automação,
 copywriter, social media, vendedor, product manager e operador executivo.
 Explique passo a passo, como se estivesse fazendo pelo usuário.
 Nunca execute ações sensíveis sem aprovação humana.
-Quando gerar execução, entregue plano seguro e prático.
 """
 
 AGENTS = {
@@ -126,14 +144,15 @@ def vector_search(query, user_id=None, limit=6):
     scored.sort(reverse=True)
     return [x[1] for x in scored[:limit]]
 
-def ask_ai(prompt, role="ceo", user_id=None):
+def ask_ai(prompt, role="ceo", user_id=None, custom_prompt=None):
     user_id = user_id or uid()
     memories = "\n".join(vector_search(prompt, user_id))
+    role_prompt = custom_prompt or AGENTS.get(role, "")
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": MASTER_PROMPT},
-            {"role": "system", "content": AGENTS.get(role, "")},
+            {"role": "system", "content": role_prompt},
             {"role": "system", "content": "MEMÓRIA:\n" + memories},
             {"role": "user", "content": prompt}
         ],
@@ -207,43 +226,24 @@ def debate_agents(goal, user_id):
     return final + "\n\n# DECISÃO FINAL INTEGRADA\n\n" + synthesis
 
 def generate_landing_html(title, offer):
-    html = f"""
+    return f"""
 <!doctype html>
 <html>
-<head>
-<meta charset="utf-8">
-<title>{title}</title>
+<head><meta charset="utf-8"><title>{title}</title>
 <style>
 body{{margin:0;background:#07070a;color:white;font-family:Arial}}
 section{{padding:70px 10%;}}
 .hero{{background:linear-gradient(135deg,#07070a,#2b0055);min-height:70vh;display:flex;flex-direction:column;justify-content:center}}
-h1{{font-size:54px;max-width:900px}}
-p{{font-size:20px;line-height:1.6;color:#ddd;max-width:850px}}
+h1{{font-size:54px;max-width:900px}}p{{font-size:20px;line-height:1.6;color:#ddd;max-width:850px}}
 .cta{{display:inline-block;background:#9333ea;color:white;padding:18px 28px;border-radius:14px;text-decoration:none;font-weight:bold;margin-top:20px}}
 .card{{background:#111827;border:1px solid #333;border-radius:18px;padding:24px;margin:15px 0}}
-</style>
-</head>
+</style></head>
 <body>
-<section class="hero">
-<h1>{title}</h1>
-<p>{offer}</p>
-<a class="cta" href="#">Quero começar agora</a>
-</section>
-<section>
-<h2>Por que isso funciona?</h2>
-<div class="card">Oferta clara, direta e criada para conversão.</div>
-<div class="card">Estrutura visual premium e pronta para captar leads.</div>
-<div class="card">Mensagem forte, simples e orientada a resultado.</div>
-</section>
-<section>
-<h2>Próximo passo</h2>
-<p>Solicite um diagnóstico e receba um plano personalizado.</p>
-<a class="cta" href="#">Solicitar diagnóstico</a>
-</section>
-</body>
-</html>
+<section class="hero"><h1>{title}</h1><p>{offer}</p><a class="cta" href="#">Quero começar agora</a></section>
+<section><h2>Por que isso funciona?</h2><div class="card">Oferta clara, direta e criada para conversão.</div><div class="card">Estrutura visual premium e pronta para captar leads.</div><div class="card">Mensagem forte, simples e orientada a resultado.</div></section>
+<section><h2>Próximo passo</h2><p>Solicite um diagnóstico e receba um plano personalizado.</p><a class="cta" href="#">Solicitar diagnóstico</a></section>
+</body></html>
 """
-    return html
 
 async def send_long(update, text):
     for i in range(0, len(text), 3900):
@@ -252,15 +252,23 @@ async def send_long(update, text):
 # TELEGRAM
 
 async def start(update, context):
-    await update.message.reply_text("🔥 StreetCore OS V10 online. Digite /menu")
+    await update.message.reply_text("🔥 StreetCore OS V11 online. Digite /menu")
 
 async def menu(update, context):
     await update.message.reply_text("""
-🔥 STREETCORE OS V10
+🔥 STREETCORE OS V11
 
 /completo ideia
 /debate ideia
 /ceo /marketing /dev /design /video /auto /sales /finance /ops
+
+/criar_agente nome | função
+/agentes
+/usar_agente id | pedido
+
+/template tipo | nome | descrição | prompt
+/templates
+/executar_template id | ideia
 
 /criar_empresa ideia
 /criar_saas ideia
@@ -269,7 +277,6 @@ async def menu(update, context):
 /criar_marca ideia
 /criar_produto ideia
 /criar_landing ideia
-/criar_site ideia
 /criar_projeto ideia
 
 /post instagram tema
@@ -287,8 +294,8 @@ async def menu(update, context):
 """)
 
 async def status(update, context):
-    text = "🚀 STREETCORE OS V10\n\n"
-    for t in ["memory","tasks","projects","posts","videos","workflows","leads","content_calendar","pages","approvals","logs"]:
+    text = "🚀 STREETCORE OS V11\n\n"
+    for t in ["memory","tasks","projects","posts","videos","workflows","leads","content_calendar","pages","approvals","logs","custom_agents","templates"]:
         total = cursor.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
         text += f"{t}: {total}\n"
     await update.message.reply_text(text)
@@ -317,6 +324,66 @@ async def sales(u,c): await generic_agent(u,c,"sales")
 async def finance(u,c): await generic_agent(u,c,"finance")
 async def ops(u,c): await generic_agent(u,c,"ops")
 
+async def criar_agente(update, context):
+    text = " ".join(context.args)
+    if "|" not in text:
+        await update.message.reply_text("Use: /criar_agente Nome | função do agente")
+        return
+    name, desc = [x.strip() for x in text.split("|", 1)]
+    system_prompt = f"Você é {name}. {desc}. Responda em português, de forma prática e passo a passo."
+    cursor.execute("INSERT INTO custom_agents(user_id,name,description,system_prompt,created_at) VALUES(?,?,?,?,?)", (1, name, desc, system_prompt, now()))
+    conn.commit()
+    await update.message.reply_text("✅ Agente criado.")
+
+async def agentes(update, context):
+    rows = cursor.execute("SELECT id,name,description FROM custom_agents WHERE user_id=? ORDER BY id DESC", (1,)).fetchall()
+    text = "🤖 AGENTES\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2]}\n"
+    await send_long(update, text if rows else "Nenhum agente.")
+
+async def usar_agente(update, context):
+    text = " ".join(context.args)
+    if "|" not in text:
+        await update.message.reply_text("Use: /usar_agente id | pedido")
+        return
+    idtxt, prompt = [x.strip() for x in text.split("|", 1)]
+    row = cursor.execute("SELECT name,system_prompt FROM custom_agents WHERE id=? AND user_id=?", (int(idtxt), 1)).fetchone()
+    if not row:
+        await update.message.reply_text("Agente não encontrado.")
+        return
+    await send_long(update, ask_ai(prompt, row[0], 1, row[1]))
+
+async def template(update, context):
+    text = " ".join(context.args)
+    parts = [x.strip() for x in text.split("|")]
+    if len(parts) < 4:
+        await update.message.reply_text("Use: /template tipo | nome | descrição | prompt")
+        return
+    cursor.execute("INSERT INTO templates(user_id,type,name,description,payload,created_at) VALUES(?,?,?,?,?,?)", (1, parts[0], parts[1], parts[2], parts[3], now()))
+    conn.commit()
+    await update.message.reply_text("✅ Template salvo.")
+
+async def templates(update, context):
+    rows = cursor.execute("SELECT id,type,name,description FROM templates WHERE user_id=? ORDER BY id DESC", (1,)).fetchall()
+    text = "📦 TEMPLATES\n\n"
+    for r in rows:
+        text += f"{r[0]}. [{r[1]}] {r[2]} — {r[3]}\n"
+    await send_long(update, text if rows else "Nenhum template.")
+
+async def executar_template(update, context):
+    text = " ".join(context.args)
+    if "|" not in text:
+        await update.message.reply_text("Use: /executar_template id | ideia")
+        return
+    idtxt, idea = [x.strip() for x in text.split("|", 1)]
+    row = cursor.execute("SELECT type,name,payload FROM templates WHERE id=? AND user_id=?", (int(idtxt), 1)).fetchone()
+    if not row:
+        await update.message.reply_text("Template não encontrado.")
+        return
+    result = ask_ai(row[2] + "\n\nIdeia:\n" + idea, "ceo", 1)
+    await send_long(update, result)
+
 async def creator(update, context, kind):
     idea = " ".join(context.args)
     prompts = {
@@ -343,9 +410,6 @@ async def criar_landing(update, context):
     cursor.execute("INSERT INTO pages(user_id,type,title,html,created_at) VALUES(?,?,?,?,?)", (1, "landing", idea[:80], html, now()))
     conn.commit()
     await update.message.reply_text("✅ Landing page criada e salva no painel.")
-
-async def criar_site(update, context):
-    await criar_landing(update, context)
 
 async def criar_projeto(update, context):
     goal = " ".join(context.args)
@@ -383,10 +447,7 @@ async def social30(update, context):
     theme = " ".join(context.args)
     plan = ask_ai(f"Crie calendário de 30 posts para: {theme}. Para cada: título, plataforma, legenda curta, CTA.", "marketing", 1)
     for i in range(1, 31):
-        cursor.execute(
-            "INSERT INTO content_calendar(user_id,title,platform,publish_date,status,created_at) VALUES(?,?,?,?,?,?)",
-            (1, f"Post {i} - {theme[:30]}", "Instagram/TikTok", f"Dia {i}", "planejado", now())
-        )
+        cursor.execute("INSERT INTO content_calendar(user_id,title,platform,publish_date,status,created_at) VALUES(?,?,?,?,?,?)", (1, f"Post {i} - {theme[:30]}", "Instagram/TikTok", f"Dia {i}", "planejado", now()))
     conn.commit()
     await send_long(update, plan)
 
@@ -426,14 +487,14 @@ async def aprovar_cmd(update, context):
 # WEB
 
 web = Flask(__name__)
-web.secret_key = os.getenv("FLASK_SECRET", "streetcore-v10-" + secrets.token_hex(8))
+web.secret_key = os.getenv("FLASK_SECRET", "streetcore-v11-" + secrets.token_hex(8))
 
 CSS = """
 <style>
 *{box-sizing:border-box;font-family:Arial}body{margin:0;background:#050510;color:white;min-height:100vh}a{text-decoration:none;color:white}
-.app{display:flex;min-height:100vh}.sidebar{width:285px;background:#0d0d18;padding:20px;border-right:1px solid #222}
+.app{display:flex;min-height:100vh}.sidebar{width:295px;background:#0d0d18;padding:20px;border-right:1px solid #222}
 .logo{font-size:26px;font-weight:bold;color:#a855f7}.status{font-size:12px;opacity:.7;margin:12px 0 20px}
-.nav a{display:block;padding:13px;background:#151525;margin-bottom:9px;border-radius:12px}.nav a:hover{background:#222240}
+.nav a{display:block;padding:12px;background:#151525;margin-bottom:8px;border-radius:12px}.nav a:hover{background:#222240}
 .main{flex:1}.top{height:70px;background:#0d0d18;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between;padding:0 20px}
 .content{padding:22px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
 .card{background:#111827;border:1px solid #333;border-radius:18px;padding:18px}.big{font-size:36px;font-weight:bold;color:#a855f7}
@@ -463,27 +524,23 @@ def current_name():
 def layout(title, body):
     return f"""
 <!doctype html><html><head><title>{title}</title><meta name="viewport" content="width=device-width, initial-scale=1">{CSS}</head>
-<body><div class="app"><div class="sidebar"><div class="logo">🔥 StreetCore OS</div><div class="status">V10 EXECUTION SYSTEM<br>{current_name()}</div>
+<body><div class="app"><div class="sidebar"><div class="logo">🔥 StreetCore OS</div><div class="status">V11 AGENT FACTORY<br>{current_name()}</div>
 <div class="nav">
-<a href="/">Dashboard</a><a href="/today">Hoje</a><a href="/chat">Chat IA</a><a href="/command">Command Center</a><a href="/approvals">Approval Center</a>
-<a href="/kanban">Kanban</a><a href="/projects">Projetos</a><a href="/calendar">Calendário</a><a href="/crm">CRM</a>
-<a href="/posts">Posts</a><a href="/videos">Vídeos</a><a href="/workflows">Workflows</a><a href="/automations">Automações</a>
-<a href="/pages">Sites/Landings</a><a href="/memory">Memória</a><a href="/files">Arquivos</a><a href="/logs">Logs</a>
-<a href="/analytics-page">Analytics</a><a href="/logout">Sair</a></div></div>
-<div class="main"><div class="top"><b>{title}</b><span>StreetCore OS V10</span></div><div class="content">{body}</div></div></div></body></html>
+<a href="/">Dashboard</a><a href="/today">Hoje</a><a href="/chat">Chat IA</a><a href="/agent-builder">Agent Builder</a><a href="/templates">Templates</a><a href="/marketplace">Marketplace</a>
+<a href="/command">Command Center</a><a href="/approvals">Approval Center</a><a href="/kanban">Kanban</a><a href="/projects">Projetos</a><a href="/calendar">Calendário</a><a href="/crm">CRM</a>
+<a href="/posts">Posts</a><a href="/videos">Vídeos</a><a href="/workflows">Workflows</a><a href="/automations">Automações</a><a href="/pages">Sites/Landings</a><a href="/memory">Memória</a><a href="/files">Arquivos</a><a href="/logs">Logs</a><a href="/analytics-page">Analytics</a><a href="/logout">Sair</a>
+</div></div><div class="main"><div class="top"><b>{title}</b><span>StreetCore OS V11</span></div><div class="content">{body}</div></div></div></body></html>
 """
 
 @web.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
-        row = cursor.execute("SELECT id,password FROM users WHERE email=?", (email,)).fetchone()
-        if row and check_password_hash(row[1], password):
+        row = cursor.execute("SELECT id,password FROM users WHERE email=?", (request.form.get("email"),)).fetchone()
+        if row and check_password_hash(row[1], request.form.get("password")):
             session["user_id"] = row[0]
             return redirect("/")
     return f"""<!doctype html><html><head><title>Login</title>{CSS}</head><body><div class="login">
-<h1>🔥 StreetCore OS V10</h1><form method="POST">
+<h1>🔥 StreetCore OS V11</h1><form method="POST">
 <input name="email" value="admin@streetcore.ai"><br><br><input name="password" type="password" placeholder="Senha"><br><br><button>Entrar</button>
 </form><p>Senha padrão: streetcore123</p></div></body></html>"""
 
@@ -496,9 +553,112 @@ def logout():
 def dashboard():
     if not require_login(): return redirect("/login")
     cards = ""
-    for t in ["projects","tasks","posts","videos","workflows","automations","approvals","leads","content_calendar","pages","logs"]:
+    for t in ["custom_agents","templates","projects","tasks","posts","videos","workflows","automations","approvals","leads","pages","logs"]:
         cards += f"<div class='card'><h3>{t}</h3><div class='big'>{count_table(t)}</div></div>"
     return layout("Dashboard Executivo", f"<div class='grid'>{cards}</div>")
+
+@web.route("/agent-builder")
+def agent_builder():
+    if not require_login(): return redirect("/login")
+    rows = cursor.execute("SELECT id,name,description FROM custom_agents WHERE user_id=? ORDER BY id DESC", (uid(),)).fetchall()
+    html = """
+<div class="card"><h2>Criar Agente Personalizado</h2>
+<form method="POST" action="/add-agent">
+<input name="name" placeholder="Nome do agente"><br><br>
+<textarea name="description" placeholder="Função do agente"></textarea><br><br>
+<textarea name="system_prompt" placeholder="Prompt avançado do agente"></textarea><br><br>
+<button>Criar agente</button>
+</form></div><br><div class="card"><table><tr><th>ID</th><th>Nome</th><th>Descrição</th><th>Testar</th></tr>
+"""
+    for r in rows:
+        html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td><a href='/test-agent/{r[0]}'><button>Testar</button></a></td></tr>"
+    html += "</table></div>"
+    return layout("Agent Builder", html)
+
+@web.route("/add-agent", methods=["POST"])
+def add_agent():
+    prompt = request.form.get("system_prompt") or f"Você é {request.form.get('name')}. {request.form.get('description')}"
+    cursor.execute("INSERT INTO custom_agents(user_id,name,description,system_prompt,created_at) VALUES(?,?,?,?,?)", (uid(), request.form.get("name"), request.form.get("description"), prompt, now()))
+    conn.commit()
+    return redirect("/agent-builder")
+
+@web.route("/test-agent/<int:agent_id>")
+def test_agent(agent_id):
+    if not require_login(): return redirect("/login")
+    row = cursor.execute("SELECT name FROM custom_agents WHERE id=? AND user_id=?", (agent_id, uid())).fetchone()
+    if not row: return redirect("/agent-builder")
+    return layout("Testar Agente", f"""
+<div class="card">
+<h2>{row[0]}</h2>
+<input id="prompt" placeholder="Pedido para o agente"><br><br>
+<button onclick="run()">Executar</button>
+<div id="out" class="msg ai">Resultado aqui.</div>
+</div>
+<script>
+async function run(){{const p=document.getElementById('prompt').value;document.getElementById('out').innerText='Executando...';const r=await fetch('/run-agent-api',{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{agent_id},prompt:p}})});const d=await r.json();document.getElementById('out').innerText=d.response}}
+</script>
+""")
+
+@web.route("/templates")
+def templates_page():
+    if not require_login(): return redirect("/login")
+    rows = cursor.execute("SELECT id,type,name,description FROM templates WHERE user_id=? ORDER BY id DESC", (uid(),)).fetchall()
+    html = """
+<div class="card"><h2>Criar Template</h2>
+<form method="POST" action="/add-template">
+<input name="type" placeholder="Tipo: post, landing, workflow, business"><br><br>
+<input name="name" placeholder="Nome"><br><br>
+<textarea name="description" placeholder="Descrição"></textarea><br><br>
+<textarea name="payload" placeholder="Prompt/template"></textarea><br><br>
+<button>Salvar template</button>
+</form></div><br><div class="card"><table><tr><th>ID</th><th>Tipo</th><th>Nome</th><th>Descrição</th><th>Executar</th></tr>
+"""
+    for r in rows:
+        html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td><a href='/execute-template/{r[0]}'><button>Executar</button></a></td></tr>"
+    html += "</table></div>"
+    return layout("Templates", html)
+
+@web.route("/add-template", methods=["POST"])
+def add_template():
+    cursor.execute("INSERT INTO templates(user_id,type,name,description,payload,created_at) VALUES(?,?,?,?,?,?)", (uid(), request.form.get("type"), request.form.get("name"), request.form.get("description"), request.form.get("payload"), now()))
+    conn.commit()
+    return redirect("/templates")
+
+@web.route("/execute-template/<int:template_id>")
+def execute_template_page(template_id):
+    if not require_login(): return redirect("/login")
+    return layout("Executar Template", f"""
+<div class="card">
+<input id="idea" placeholder="Ideia base"><br><br>
+<button onclick="run()">Executar</button>
+<div id="out" class="msg ai">Resultado aqui.</div>
+</div>
+<script>
+async function run(){{const idea=document.getElementById('idea').value;document.getElementById('out').innerText='Gerando...';const r=await fetch('/execute-template-api',{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{template_id},idea:idea}})});const d=await r.json();document.getElementById('out').innerText=d.response}}
+</script>
+""")
+
+@web.route("/marketplace")
+def marketplace_page():
+    if not require_login(): return redirect("/login")
+    rows = cursor.execute("SELECT id,type,name,description FROM marketplace ORDER BY id DESC").fetchall()
+    html = "<div class='grid'>"
+    for r in rows:
+        html += f"<div class='card'><h3>{r[2]}</h3><p>{r[1]}</p><p>{r[3]}</p><a href='/install-marketplace/{r[0]}'><button>Instalar</button></a></div>"
+    html += "</div>"
+    return layout("Marketplace Interno", html)
+
+@web.route("/install-marketplace/<int:item_id>")
+def install_marketplace(item_id):
+    if not require_login(): return redirect("/login")
+    row = cursor.execute("SELECT type,name,description,payload FROM marketplace WHERE id=?", (item_id,)).fetchone()
+    if row:
+        if row[0] == "agent":
+            cursor.execute("INSERT INTO custom_agents(user_id,name,description,system_prompt,created_at) VALUES(?,?,?,?,?)", (uid(), row[1], row[2], row[3], now()))
+        else:
+            cursor.execute("INSERT INTO templates(user_id,type,name,description,payload,created_at) VALUES(?,?,?,?,?,?)", (uid(), row[0], row[1], row[2], row[3], now()))
+        conn.commit()
+    return redirect("/marketplace")
 
 @web.route("/today")
 def today():
@@ -506,12 +666,11 @@ def today():
     tasks = cursor.execute("SELECT id,task,priority FROM tasks WHERE user_id=? AND status!='concluída' ORDER BY id DESC LIMIT 12", (uid(),)).fetchall()
     approvals = cursor.execute("SELECT id,action FROM approvals WHERE user_id=? AND status='pendente' ORDER BY id DESC LIMIT 8", (uid(),)).fetchall()
     posts = cursor.execute("SELECT title,platform,publish_date FROM content_calendar WHERE user_id=? AND status='planejado' ORDER BY id DESC LIMIT 8", (uid(),)).fetchall()
-    html = "<div class='grid'>"
-    html += "<div class='card'><h2>Prioridades de hoje</h2>"
-    for t in tasks: html += f"<p><b>{t[0]}</b> — {t[1]} <br><small>{t[2]}</small></p>"
-    html += "</div><div class='card'><h2>Aprovações pendentes</h2>"
+    html = "<div class='grid'><div class='card'><h2>Prioridades</h2>"
+    for t in tasks: html += f"<p><b>{t[0]}</b> — {t[1]}<br><small>{t[2]}</small></p>"
+    html += "</div><div class='card'><h2>Aprovações</h2>"
     for a in approvals: html += f"<p>#{a[0]} — {a[1][:120]}</p>"
-    html += "</div><div class='card'><h2>Conteúdo planejado</h2>"
+    html += "</div><div class='card'><h2>Conteúdo</h2>"
     for p in posts: html += f"<p>{p[0]} — {p[1]} — {p[2]}</p>"
     html += "</div></div><br><div class='card'><a href='/generate-today'><button>Gerar plano IA de hoje</button></a></div>"
     return layout("O que fazer hoje", html)
@@ -527,7 +686,7 @@ def generate_today():
 def chat():
     if not require_login(): return redirect("/login")
     return layout("Chat IA", """
-<div class="card"><div class="chat" id="chat"><div class="msg ai">🔥 StreetCore OS V10 online.</div></div>
+<div class="card"><div class="chat" id="chat"><div class="msg ai">🔥 StreetCore OS V11 online.</div></div>
 <div class="bottom"><div class="row"><select id="agent">
 <option value="ceo">CEO</option><option value="marketing">Marketing</option><option value="dev">Dev</option><option value="design">Design</option><option value="video">Video</option><option value="automation">Automation</option><option value="sales">Sales</option><option value="finance">Finance</option><option value="ops">Ops</option>
 </select><input id="prompt" placeholder="Digite sua ideia..."><button onclick="sendMessage()">Enviar</button></div>
@@ -721,6 +880,23 @@ def ask_web():
         return jsonify({"response":"🛡 Ação sensível criada para aprovação."})
     return jsonify({"response":ask_ai(prompt, agent, uid())})
 
+@web.route("/run-agent-api", methods=["POST"])
+def run_agent_api():
+    data = request.get_json()
+    row = cursor.execute("SELECT name,system_prompt FROM custom_agents WHERE id=? AND user_id=?", (data.get("id"), uid())).fetchone()
+    if not row:
+        return jsonify({"response":"Agente não encontrado."})
+    return jsonify({"response":ask_ai(data.get("prompt",""), row[0], uid(), row[1])})
+
+@web.route("/execute-template-api", methods=["POST"])
+def execute_template_api():
+    data = request.get_json()
+    row = cursor.execute("SELECT type,name,payload FROM templates WHERE id=? AND user_id=?", (data.get("id"), uid())).fetchone()
+    if not row:
+        return jsonify({"response":"Template não encontrado."})
+    result = ask_ai(row[2] + "\n\nIdeia:\n" + data.get("idea",""), "ceo", uid())
+    return jsonify({"response":result})
+
 @web.route("/command-api", methods=["POST"])
 def command_api():
     data = request.get_json()
@@ -759,7 +935,7 @@ def upload():
 
 @web.route("/export/<table>")
 def export_table(table):
-    allowed = ["posts","videos","workflows","memory","files","analytics","leads","projects","content_calendar","pages","logs","approvals","automations"]
+    allowed = ["posts","videos","workflows","memory","files","analytics","leads","projects","content_calendar","pages","logs","approvals","automations","custom_agents","templates"]
     if table not in allowed: return "invalid"
     rows = cursor.execute(f"SELECT * FROM {table} WHERE user_id=?", (uid(),)).fetchall()
     output = io.StringIO()
@@ -770,7 +946,7 @@ def export_table(table):
 
 @web.route("/health")
 def health():
-    return "OK STREETCORE V10 ONLINE", 200
+    return "OK STREETCORE V11 ONLINE", 200
 
 def automation_loop():
     while True:
@@ -800,8 +976,10 @@ def run_telegram():
     handlers = {
         "start":start,"menu":menu,"status":status,"completo":completo,"debate":debate,
         "ceo":ceo,"marketing":marketing,"dev":dev,"design":design,"video":video_cmd,"auto":auto,"sales":sales,"finance":finance,"ops":ops,
+        "criar_agente":criar_agente,"agentes":agentes,"usar_agente":usar_agente,
+        "template":template,"templates":templates,"executar_template":executar_template,
         "criar_empresa":criar_empresa,"criar_saas":criar_saas,"criar_campanha":criar_campanha,"criar_funil":criar_funil,"criar_marca":criar_marca,"criar_produto":criar_produto,
-        "criar_landing":criar_landing,"criar_site":criar_site,"criar_projeto":criar_projeto,
+        "criar_landing":criar_landing,"criar_projeto":criar_projeto,
         "post":post,"social30":social30,"videoai":videoai,"workflow":workflow,"copiloto":copiloto,
         "tarefa":tarefa,"salvar":salvar,"buscar":buscar,"hoje":hoje_cmd,"aprovar":aprovar_cmd
     }
@@ -812,5 +990,5 @@ def run_telegram():
 threading.Thread(target=run_telegram, daemon=True).start()
 threading.Thread(target=automation_loop, daemon=True).start()
 
-print("🔥 STREETCORE OS V10 ONLINE")
+print("🔥 STREETCORE OS V11 ONLINE")
 web.run(host="0.0.0.0", port=PORT)
