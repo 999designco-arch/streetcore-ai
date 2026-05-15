@@ -7,7 +7,8 @@ def painel_admin():
     return f"""
     <html>
     <head>
-        <title>StreetCore OS V15 FREE</title>
+
+        <title>StreetCore OS V16 FREE</title>
 
         <style>
 
@@ -31,16 +32,13 @@ def painel_admin():
                 font-weight: bold;
             }}
 
-            h1 {{
-                font-size: 34px;
-            }}
-
         </style>
+
     </head>
 
     <body>
 
-        <h1>🔥 STREETCORE OS V15 FREE</h1>
+        <h1>🔥 STREETCORE OS V16 FREE</h1>
 
         <div class="card">
 
@@ -52,20 +50,19 @@ def painel_admin():
 
             <p>Telegram ativo</p>
             <p>Flask ativo</p>
-            <p>Railway ativo</p>
             <p>SQLite ativo</p>
+            <p>Railway ativo</p>
 
         </div>
 
         <div class="card">
 
-            <h2>Novidades V15</h2>
+            <h2>Novidades V16</h2>
 
-            <p>Autenticação simples</p>
-            <p>Tarefas persistentes</p>
-            <p>Logs persistentes</p>
-            <p>Scheduler operacional</p>
-            <p>Modo operacional IA</p>
+            <p>Clientes persistentes</p>
+            <p>Calendário persistente</p>
+            <p>Financeiro persistente</p>
+            <p>Relatórios IA</p>
 
         </div>
 
