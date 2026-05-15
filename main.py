@@ -15,20 +15,17 @@ from telegram.ext import (
 )
 
 from services.database_service import iniciar_banco
-
+from services.admin_service import painel_admin
 from services.analytics_service import (
     registrar_evento,
     resumo_analytics
 )
-
 from services.memory_service import (
-    salvar_memoria,
-    listar_memorias
+    salvar_memoria
 )
-
-from services.admin_service import painel_admin
-
-from services.free_ai_service import resposta_free_ai
+from services.free_ai_service import (
+    resposta_free_ai
+)
 
 from services.task_service import (
     criar_tarefa,
@@ -44,11 +41,31 @@ from services.scheduler_service import (
     executar_scheduler
 )
 
+from services.report_service import (
+    gerar_relatorio
+)
+
+from services.calendar_service import (
+    criar_evento,
+    listar_eventos
+)
+
+from services.client_service import (
+    criar_cliente,
+    listar_clientes
+)
+
+from services.finance_service import (
+    adicionar_receita,
+    resumo_financeiro
+)
+
 TELEGRAM_TOKEN = os.getenv(
     "TELEGRAM_TOKEN"
 )
 
 if not TELEGRAM_TOKEN:
+
     raise ValueError(
         "TELEGRAM_TOKEN não encontrado."
     )
@@ -67,7 +84,7 @@ def health():
 
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V15 FREE"
+        "version": "StreetCore OS V16 FREE"
     })
 
 @app.route("/analytics")
@@ -87,20 +104,39 @@ def tasks():
 
     return f"<pre>{listar_tarefas()}</pre>"
 
+@app.route("/clients")
+def clients():
+
+    return f"<pre>{listar_clientes()}</pre>"
+
+@app.route("/calendar")
+def calendar():
+
+    return f"<pre>{listar_eventos()}</pre>"
+
+@app.route("/finance")
+def finance():
+
+    return f"<pre>{resumo_financeiro()}</pre>"
+
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    registrar_evento("start")
-
     await update.message.reply_text(
-        "🔥 STREETCORE OS V15 FREE\n\n"
+        "🔥 STREETCORE OS V16 FREE\n\n"
         "NOVOS COMANDOS:\n"
         "/task criar campanha\n"
         "/tasks\n"
         "/logs\n"
         "/scheduler\n"
+        "/client joao\n"
+        "/clients\n"
+        "/event live_hoje 20h\n"
+        "/calendar\n"
+        "/finance 100\n"
+        "/report\n"
     )
 
 async def task(
@@ -112,23 +148,14 @@ async def task(
         context.args
     )
 
-    if not nome:
-
-        await update.message.reply_text(
-            "Digite assim:\n"
-            "/task criar campanha"
-        )
-
-        return
-
-    registrar_evento("task")
+    resposta = criar_tarefa(
+        nome
+    )
 
     registrar_log(
         "TASK",
         nome
     )
-
-    resposta = criar_tarefa(nome)
 
     await update.message.reply_text(
         resposta
@@ -159,6 +186,103 @@ async def scheduler_cmd(
 
     await update.message.reply_text(
         executar_scheduler()
+    )
+
+async def client(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    nome = " ".join(
+        context.args
+    )
+
+    resposta = criar_cliente(
+        nome
+    )
+
+    await update.message.reply_text(
+        resposta
+    )
+
+async def clients_cmd(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    await update.message.reply_text(
+        listar_clientes()
+    )
+
+async def event(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if len(context.args) < 2:
+
+        await update.message.reply_text(
+            "Use:\n/event nome data"
+        )
+
+        return
+
+    nome = context.args[0]
+
+    data = " ".join(
+        context.args[1:]
+    )
+
+    resposta = criar_evento(
+        nome,
+        data
+    )
+
+    await update.message.reply_text(
+        resposta
+    )
+
+async def calendar_cmd(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    await update.message.reply_text(
+        listar_eventos()
+    )
+
+async def finance(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not context.args:
+
+        await update.message.reply_text(
+            resumo_financeiro()
+        )
+
+        return
+
+    valor = float(
+        context.args[0]
+    )
+
+    resposta = adicionar_receita(
+        valor
+    )
+
+    await update.message.reply_text(
+        resposta
+    )
+
+async def report(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    await update.message.reply_text(
+        gerar_relatorio()
     )
 
 async def responder(
@@ -219,6 +343,48 @@ async def telegram_main():
     )
 
     telegram_app.add_handler(
+        CommandHandler(
+            "client",
+            client
+        )
+    )
+
+    telegram_app.add_handler(
+        CommandHandler(
+            "clients",
+            clients_cmd
+        )
+    )
+
+    telegram_app.add_handler(
+        CommandHandler(
+            "event",
+            event
+        )
+    )
+
+    telegram_app.add_handler(
+        CommandHandler(
+            "calendar",
+            calendar_cmd
+        )
+    )
+
+    telegram_app.add_handler(
+        CommandHandler(
+            "finance",
+            finance
+        )
+    )
+
+    telegram_app.add_handler(
+        CommandHandler(
+            "report",
+            report
+        )
+    )
+
+    telegram_app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             responder
@@ -226,7 +392,7 @@ async def telegram_main():
     )
 
     print(
-        "🔥 Telegram iniciando V15 FREE..."
+        "🔥 Telegram iniciando V16 FREE..."
     )
 
     await telegram_app.initialize()
@@ -236,7 +402,7 @@ async def telegram_main():
     await telegram_app.updater.start_polling()
 
     print(
-        "✅ Telegram ONLINE V15 FREE"
+        "✅ Telegram ONLINE V16 FREE"
     )
 
     await asyncio.Event().wait()
