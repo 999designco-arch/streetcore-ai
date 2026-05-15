@@ -48,6 +48,12 @@ from services.planner_service import gerar_grade_conteudo
 from services.product_service import listar_produtos
 from services.agent_service import agentes_conversando
 
+from services.brain_service import cerebro_operacional
+from services.goal_service import criar_meta, listar_metas, atualizar_meta
+from services.kpi_service import registrar_kpi, listar_kpis
+from services.diagnostic_service import diagnostico_empresa
+from services.auto_strategy_service import plano_automatico
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not TELEGRAM_TOKEN:
@@ -64,7 +70,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V19 FREE MEGA"
+        "version": "StreetCore OS V20 ULTRA FREE"
     })
 
 @app.route("/analytics")
@@ -131,9 +137,26 @@ def pipeline_page():
 def catalog_page():
     return f"<pre>{listar_catalogo()}</pre>"
 
+@app.route("/goals")
+def goals_page():
+    return f"<pre>{listar_metas()}</pre>"
+
+@app.route("/kpis")
+def kpis_page():
+    return f"<pre>{listar_kpis()}</pre>"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V19 FREE MEGA\n\n"
+        "🔥 STREETCORE OS V20 ULTRA FREE\n\n"
+        "IA ULTRA:\n"
+        "/brain analisar operação\n"
+        "/diagnostic\n"
+        "/autoplan street graff\n"
+        "/goal vender_1000 1000\n"
+        "/goals\n"
+        "/goalstatus 1 concluida\n"
+        "/kpi vendas 10\n"
+        "/kpis\n\n"
         "CONTEÚDO:\n"
         "/post camisetas\n"
         "/story adesivos\n"
@@ -186,6 +209,48 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/backup\n"
         "/backups"
     )
+
+async def brain(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pergunta = " ".join(context.args) or "analisar operação"
+    await update.message.reply_text(cerebro_operacional(pergunta))
+
+async def diagnostic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(diagnostico_empresa())
+
+async def autoplan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    tema = " ".join(context.args) or "Street Graff"
+    await update.message.reply_text(plano_automatico(tema))
+
+async def goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /goal vender_1000 1000")
+        return
+
+    nome = context.args[0]
+    valor = " ".join(context.args[1:])
+    await update.message.reply_text(criar_meta(nome, valor))
+
+async def goals_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_metas())
+
+async def goalstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /goalstatus 1 concluida")
+        return
+
+    await update.message.reply_text(atualizar_meta(context.args[0], " ".join(context.args[1:])))
+
+async def kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /kpi vendas 10")
+        return
+
+    nome = context.args[0]
+    valor = " ".join(context.args[1:])
+    await update.message.reply_text(registrar_kpi(nome, valor))
+
+async def kpis_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_kpis())
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(gerar_post_instagram(" ".join(context.args) or "Street Graff"))
@@ -260,9 +325,7 @@ async def event(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use:\n/event nome data")
         return
 
-    nome = context.args[0]
-    data = " ".join(context.args[1:])
-    await update.message.reply_text(criar_evento(nome, data))
+    await update.message.reply_text(criar_evento(context.args[0], " ".join(context.args[1:])))
 
 async def calendar_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_eventos())
@@ -273,8 +336,7 @@ async def finance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        valor = float(context.args[0].replace(",", "."))
-        await update.message.reply_text(adicionar_receita(valor))
+        await update.message.reply_text(adicionar_receita(float(context.args[0].replace(",", "."))))
     except ValueError:
         await update.message.reply_text("Use assim: /finance 100")
 
@@ -284,8 +346,7 @@ async def expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        valor = float(context.args[0].replace(",", "."))
-        await update.message.reply_text(adicionar_despesa(valor))
+        await update.message.reply_text(adicionar_despesa(float(context.args[0].replace(",", "."))))
     except ValueError:
         await update.message.reply_text("Use assim: /expense 50")
 
@@ -318,15 +379,10 @@ async def stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use assim: /stock camiseta 10")
         return
 
-    item = context.args[0]
-
     try:
-        quantidade = int(context.args[1])
+        await update.message.reply_text(adicionar_estoque(context.args[0], int(context.args[1])))
     except ValueError:
         await update.message.reply_text("A quantidade precisa ser número.")
-        return
-
-    await update.message.reply_text(adicionar_estoque(item, quantidade))
 
 async def stocklist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_estoque())
@@ -398,15 +454,10 @@ async def catalog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use assim: /catalog camiseta 35")
         return
 
-    nome = context.args[0]
-
     try:
-        preco = float(context.args[1].replace(",", "."))
+        await update.message.reply_text(criar_item_catalogo(context.args[0], float(context.args[1].replace(",", "."))))
     except ValueError:
         await update.message.reply_text("Preço inválido. Use: /catalog camiseta 35")
-        return
-
-    await update.message.reply_text(criar_item_catalogo(nome, preco))
 
 async def cataloglist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_catalogo())
@@ -421,69 +472,82 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def telegram_main():
     telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    telegram_app.add_handler(CommandHandler("start", start))
+    comandos = [
+        ("start", start),
+        ("brain", brain),
+        ("diagnostic", diagnostic),
+        ("autoplan", autoplan),
+        ("goal", goal),
+        ("goals", goals_cmd),
+        ("goalstatus", goalstatus),
+        ("kpi", kpi),
+        ("kpis", kpis_cmd),
 
-    telegram_app.add_handler(CommandHandler("post", post))
-    telegram_app.add_handler(CommandHandler("story", story))
-    telegram_app.add_handler(CommandHandler("reels", reels))
-    telegram_app.add_handler(CommandHandler("video", video))
-    telegram_app.add_handler(CommandHandler("imagem", imagem))
-    telegram_app.add_handler(CommandHandler("venda", venda))
-    telegram_app.add_handler(CommandHandler("campanha", campanha))
-    telegram_app.add_handler(CommandHandler("workflow", workflow))
-    telegram_app.add_handler(CommandHandler("legenda", legenda))
-    telegram_app.add_handler(CommandHandler("hashtags", hashtags))
-    telegram_app.add_handler(CommandHandler("grade", grade))
-    telegram_app.add_handler(CommandHandler("batch", batch))
-    telegram_app.add_handler(CommandHandler("batchreels", batchreels))
-    telegram_app.add_handler(CommandHandler("batchstories", batchstories))
-    telegram_app.add_handler(CommandHandler("produtos", produtos))
-    telegram_app.add_handler(CommandHandler("agentes", agentes))
+        ("post", post),
+        ("story", story),
+        ("reels", reels),
+        ("video", video),
+        ("imagem", imagem),
+        ("venda", venda),
+        ("campanha", campanha),
+        ("workflow", workflow),
+        ("legenda", legenda),
+        ("hashtags", hashtags),
+        ("grade", grade),
+        ("batch", batch),
+        ("batchreels", batchreels),
+        ("batchstories", batchstories),
+        ("produtos", produtos),
+        ("agentes", agentes),
 
-    telegram_app.add_handler(CommandHandler("task", task))
-    telegram_app.add_handler(CommandHandler("tasks", tasks_cmd))
-    telegram_app.add_handler(CommandHandler("logs", logs_cmd))
-    telegram_app.add_handler(CommandHandler("scheduler", scheduler_cmd))
-    telegram_app.add_handler(CommandHandler("client", client))
-    telegram_app.add_handler(CommandHandler("clients", clients_cmd))
-    telegram_app.add_handler(CommandHandler("event", event))
-    telegram_app.add_handler(CommandHandler("calendar", calendar_cmd))
-    telegram_app.add_handler(CommandHandler("finance", finance))
-    telegram_app.add_handler(CommandHandler("expense", expense))
-    telegram_app.add_handler(CommandHandler("report", report))
+        ("task", task),
+        ("tasks", tasks_cmd),
+        ("logs", logs_cmd),
+        ("scheduler", scheduler_cmd),
+        ("client", client),
+        ("clients", clients_cmd),
+        ("event", event),
+        ("calendar", calendar_cmd),
+        ("finance", finance),
+        ("expense", expense),
+        ("report", report),
 
-    telegram_app.add_handler(CommandHandler("order", order))
-    telegram_app.add_handler(CommandHandler("orders", orders_cmd))
-    telegram_app.add_handler(CommandHandler("orderstatus", orderstatus))
-    telegram_app.add_handler(CommandHandler("quote", quote))
-    telegram_app.add_handler(CommandHandler("quotes", quotes_cmd))
-    telegram_app.add_handler(CommandHandler("stock", stock))
-    telegram_app.add_handler(CommandHandler("stocklist", stocklist))
-    telegram_app.add_handler(CommandHandler("notify", notify))
-    telegram_app.add_handler(CommandHandler("notifications", notifications_cmd))
-    telegram_app.add_handler(CommandHandler("supplier", supplier))
-    telegram_app.add_handler(CommandHandler("suppliers", suppliers_cmd))
-    telegram_app.add_handler(CommandHandler("production", production))
-    telegram_app.add_handler(CommandHandler("productions", productions_cmd))
-    telegram_app.add_handler(CommandHandler("productionstatus", productionstatus))
-    telegram_app.add_handler(CommandHandler("backup", backup))
-    telegram_app.add_handler(CommandHandler("backups", backups))
+        ("order", order),
+        ("orders", orders_cmd),
+        ("orderstatus", orderstatus),
+        ("quote", quote),
+        ("quotes", quotes_cmd),
+        ("stock", stock),
+        ("stocklist", stocklist),
+        ("notify", notify),
+        ("notifications", notifications_cmd),
+        ("supplier", supplier),
+        ("suppliers", suppliers_cmd),
+        ("production", production),
+        ("productions", productions_cmd),
+        ("productionstatus", productionstatus),
+        ("backup", backup),
+        ("backups", backups),
 
-    telegram_app.add_handler(CommandHandler("lead", lead))
-    telegram_app.add_handler(CommandHandler("leads", leads_cmd))
-    telegram_app.add_handler(CommandHandler("leadstatus", leadstatus))
-    telegram_app.add_handler(CommandHandler("stage", stage))
-    telegram_app.add_handler(CommandHandler("pipeline", pipeline_cmd))
-    telegram_app.add_handler(CommandHandler("catalog", catalog))
-    telegram_app.add_handler(CommandHandler("cataloglist", cataloglist))
+        ("lead", lead),
+        ("leads", leads_cmd),
+        ("leadstatus", leadstatus),
+        ("stage", stage),
+        ("pipeline", pipeline_cmd),
+        ("catalog", catalog),
+        ("cataloglist", cataloglist),
+    ]
+
+    for nome, funcao in comandos:
+        telegram_app.add_handler(CommandHandler(nome, funcao))
 
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V19 FREE MEGA...")
+    print("🔥 Telegram iniciando V20 ULTRA FREE...")
     await telegram_app.initialize()
     await telegram_app.start()
     await telegram_app.updater.start_polling()
-    print("✅ Telegram ONLINE V19 FREE MEGA")
+    print("✅ Telegram ONLINE V20 ULTRA FREE")
 
     await asyncio.Event().wait()
 
