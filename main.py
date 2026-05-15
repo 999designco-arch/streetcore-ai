@@ -1,27 +1,57 @@
 import os
 import threading
 import asyncio
+
 from flask import Flask, jsonify, request
+
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
 from services.database_service import iniciar_banco
-from services.ai_service import gerar_resposta_ia
-from services.instagram_service import gerar_post_instagram, gerar_story, gerar_reels
-from services.image_service import gerar_prompt_imagem
-from services.video_service import gerar_roteiro_video
-from services.memory_service import salvar_memoria, listar_memorias
 from services.analytics_service import registrar_evento, resumo_analytics
-from services.workflow_service import executar_workflow
+from services.memory_service import salvar_memoria, listar_memorias
+
+from services.instagram_service import (
+    gerar_post_instagram,
+    gerar_story,
+    gerar_reels
+)
+
+from services.video_service import gerar_roteiro_video
+from services.image_service import gerar_prompt_imagem
 from services.sales_service import gerar_texto_venda
 from services.campaign_service import gerar_campanha
-from services.product_service import listar_produtos
-from services.admin_service import painel_admin
-from services.agent_service import agentes_conversando
-from services.planner_service import gerar_grade_conteudo
-from services.hashtag_service import gerar_hashtags
+from services.workflow_service import executar_workflow
+
 from services.caption_service import gerar_legenda
+from services.hashtag_service import gerar_hashtags
+from services.planner_service import gerar_grade_conteudo
+
+from services.product_service import listar_produtos
+from services.agent_service import agentes_conversando
+from services.admin_service import painel_admin
+
 from services.free_ai_service import resposta_free_ai
+
+from services.file_service import (
+    salvar_arquivo,
+    listar_arquivos
+)
+
+from services.knowledge_service import (
+    adicionar_conhecimento,
+    buscar_conhecimento
+)
+
+from services.ceo_service import modo_ceo
+from services.copilot_service import copiloto_operacional
+from services.prompt_service import listar_prompts
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -29,6 +59,7 @@ if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
 
 app = Flask(__name__)
+
 iniciar_banco()
 
 @app.route("/")
@@ -39,10 +70,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V12 FREE",
-        "telegram": "ativo",
-        "flask": "ativo",
-        "railway": "ativo",
+        "version": "StreetCore OS V13 FREE",
         "modo": "100% gratuito"
     })
 
@@ -52,163 +80,147 @@ def analytics():
 
 @app.route("/memory")
 def memory():
-    return jsonify({"memorias": listar_memorias()})
+    return jsonify({
+        "memorias": listar_memorias()
+    })
 
-@app.route("/api/workflow", methods=["POST"])
-def api_workflow():
-    data = request.json or {}
-    tema = data.get("tema", "Street Graff")
-    return jsonify({"resultado": executar_workflow(tema)})
+@app.route("/knowledge")
+def knowledge():
+    return jsonify({
+        "knowledge": buscar_conhecimento()
+    })
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    registrar_evento("start")
+
     await update.message.reply_text(
-        "🔥 STREETCORE OS V12 FREE ONLINE\n\n"
-        "Comandos:\n"
-        "/status\n"
-        "/post camisetas\n"
-        "/story adesivos\n"
-        "/reels canecas\n"
-        "/video street graff\n"
-        "/imagem camiseta personalizada\n"
-        "/venda adesivos\n"
-        "/campanha street graff\n"
-        "/workflow street graff\n"
-        "/legenda canecas\n"
-        "/hashtags camisetas\n"
-        "/grade street graff\n"
-        "/produtos\n"
-        "/agentes campanha\n"
-        "/memoria\n"
-        "/analytics\n\n"
-        "Modo: 100% grátis."
+        "🔥 STREETCORE OS V13 FREE\n\n"
+        "NOVOS COMANDOS:\n"
+        "/ceo\n"
+        "/copilot\n"
+        "/prompts\n"
+        "/knowledge\n"
+        "/files\n"
     )
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ceo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    pergunta = " ".join(context.args)
+
+    resposta = modo_ceo(pergunta)
+
+    await update.message.reply_text(resposta)
+
+async def copilot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    comando = " ".join(context.args)
+
+    resposta = copiloto_operacional(comando)
+
+    await update.message.reply_text(resposta)
+
+async def prompts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
-        "✅ STREETCORE OS V12 FREE ATIVO\n"
-        "✅ Telegram online\n"
-        "✅ Flask online\n"
-        "✅ Railway online\n"
-        "✅ Banco SQLite grátis ativo\n"
-        "✅ Memória persistente simples ativa\n"
-        "✅ Analytics persistente ativo\n"
-        "✅ Gerador de conteúdo ativo"
+        listar_prompts()
     )
 
-async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("post")
-    await update.message.reply_text(gerar_post_instagram(tema))
+async def knowledge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def story(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("story")
-    await update.message.reply_text(gerar_story(tema))
+    texto = " ".join(context.args)
 
-async def reels(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("reels")
-    await update.message.reply_text(gerar_reels(tema))
+    adicionar_conhecimento(texto)
 
-async def video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("video")
-    await update.message.reply_text(gerar_roteiro_video(tema))
+    await update.message.reply_text(
+        "✅ Conhecimento salvo."
+    )
 
-async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("imagem")
-    await update.message.reply_text(gerar_prompt_imagem(tema))
+async def files(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def venda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("venda")
-    await update.message.reply_text(gerar_texto_venda(tema))
-
-async def campanha(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("campanha")
-    await update.message.reply_text(gerar_campanha(tema))
-
-async def workflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("workflow")
-    await update.message.reply_text(executar_workflow(tema))
-
-async def legenda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("legenda")
-    await update.message.reply_text(gerar_legenda(tema))
-
-async def hashtags(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("hashtags")
-    await update.message.reply_text(gerar_hashtags(tema))
-
-async def grade(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "Street Graff"
-    registrar_evento("grade")
-    await update.message.reply_text(gerar_grade_conteudo(tema))
-
-async def produtos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    registrar_evento("produtos")
-    await update.message.reply_text(listar_produtos())
-
-async def agentes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tema = " ".join(context.args) or "campanha Street Graff"
-    registrar_evento("agentes")
-    await update.message.reply_text(agentes_conversando(tema))
-
-async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"🧠 MEMÓRIA:\n\n{listar_memorias()}")
-
-async def analytics_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"📊 ANALYTICS:\n\n{resumo_analytics()}")
+    await update.message.reply_text(
+        listar_arquivos()
+    )
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     mensagem = update.message.text
+
     salvar_memoria(mensagem)
-    registrar_evento("mensagem")
+
     resposta = resposta_free_ai(mensagem)
+
     await update.message.reply_text(resposta)
 
 async def telegram_main():
-    telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    telegram_app.add_handler(CommandHandler("start", start))
-    telegram_app.add_handler(CommandHandler("status", status))
-    telegram_app.add_handler(CommandHandler("post", post))
-    telegram_app.add_handler(CommandHandler("story", story))
-    telegram_app.add_handler(CommandHandler("reels", reels))
-    telegram_app.add_handler(CommandHandler("video", video))
-    telegram_app.add_handler(CommandHandler("imagem", imagem))
-    telegram_app.add_handler(CommandHandler("venda", venda))
-    telegram_app.add_handler(CommandHandler("campanha", campanha))
-    telegram_app.add_handler(CommandHandler("workflow", workflow))
-    telegram_app.add_handler(CommandHandler("legenda", legenda))
-    telegram_app.add_handler(CommandHandler("hashtags", hashtags))
-    telegram_app.add_handler(CommandHandler("grade", grade))
-    telegram_app.add_handler(CommandHandler("produtos", produtos))
-    telegram_app.add_handler(CommandHandler("agentes", agentes))
-    telegram_app.add_handler(CommandHandler("memoria", memoria))
-    telegram_app.add_handler(CommandHandler("analytics", analytics_cmd))
-    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
+    telegram_app = Application.builder().token(
+        TELEGRAM_TOKEN
+    ).build()
 
-    print("🔥 Telegram iniciando V12 FREE...")
+    telegram_app.add_handler(
+        CommandHandler("start", start)
+    )
+
+    telegram_app.add_handler(
+        CommandHandler("ceo", ceo)
+    )
+
+    telegram_app.add_handler(
+        CommandHandler("copilot", copilot)
+    )
+
+    telegram_app.add_handler(
+        CommandHandler("prompts", prompts)
+    )
+
+    telegram_app.add_handler(
+        CommandHandler("knowledge", knowledge)
+    )
+
+    telegram_app.add_handler(
+        CommandHandler("files", files)
+    )
+
+    telegram_app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            responder
+        )
+    )
+
+    print("🔥 Telegram iniciando V13 FREE...")
+
     await telegram_app.initialize()
+
     await telegram_app.start()
+
     await telegram_app.updater.start_polling()
-    print("✅ Telegram ONLINE V12 FREE")
+
+    print("✅ Telegram ONLINE V13 FREE")
+
     await asyncio.Event().wait()
 
 def run_telegram():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(telegram_main())
 
-threading.Thread(target=run_telegram, daemon=True).start()
+    loop = asyncio.new_event_loop()
+
+    asyncio.set_event_loop(loop)
+
+    loop.run_until_complete(
+        telegram_main()
+    )
+
+threading.Thread(
+    target=run_telegram,
+    daemon=True
+).start()
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+
+    port = int(
+        os.getenv("PORT", 8080)
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
