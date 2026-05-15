@@ -31,6 +31,23 @@ from services.supplier_service import criar_fornecedor, listar_fornecedores
 from services.production_service import criar_producao, listar_producao, atualizar_producao
 from services.backup_service import criar_backup, listar_backups
 
+from services.lead_service import criar_lead, listar_leads, atualizar_lead
+from services.pipeline_service import criar_etapa, listar_pipeline
+from services.catalog_service import criar_item_catalogo, listar_catalogo
+from services.content_batch_service import gerar_pacote_conteudo, gerar_pacote_reels, gerar_pacote_stories
+
+from services.instagram_service import gerar_post_instagram, gerar_story, gerar_reels
+from services.video_service import gerar_roteiro_video
+from services.image_service import gerar_prompt_imagem
+from services.sales_service import gerar_texto_venda
+from services.campaign_service import gerar_campanha
+from services.workflow_service import executar_workflow
+from services.caption_service import gerar_legenda
+from services.hashtag_service import gerar_hashtags
+from services.planner_service import gerar_grade_conteudo
+from services.product_service import listar_produtos
+from services.agent_service import agentes_conversando
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not TELEGRAM_TOKEN:
@@ -47,7 +64,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "StreetCore OS V18 FREE"
+        "version": "StreetCore OS V19 FREE MEGA"
     })
 
 @app.route("/analytics")
@@ -102,10 +119,37 @@ def production_page():
 def backups_page():
     return f"<pre>{listar_backups()}</pre>"
 
+@app.route("/leads")
+def leads_page():
+    return f"<pre>{listar_leads()}</pre>"
+
+@app.route("/pipeline")
+def pipeline_page():
+    return f"<pre>{listar_pipeline()}</pre>"
+
+@app.route("/catalog")
+def catalog_page():
+    return f"<pre>{listar_catalogo()}</pre>"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 STREETCORE OS V18 FREE\n\n"
-        "COMANDOS:\n"
+        "🔥 STREETCORE OS V19 FREE MEGA\n\n"
+        "CONTEÚDO:\n"
+        "/post camisetas\n"
+        "/story adesivos\n"
+        "/reels canecas\n"
+        "/video street graff\n"
+        "/imagem camiseta personalizada\n"
+        "/venda adesivos\n"
+        "/campanha street graff\n"
+        "/workflow street graff\n"
+        "/legenda canecas\n"
+        "/hashtags camisetas\n"
+        "/grade street graff\n"
+        "/batch street graff\n"
+        "/batchreels street graff\n"
+        "/batchstories street graff\n\n"
+        "OPERAÇÃO:\n"
         "/task criar campanha\n"
         "/tasks\n"
         "/logs\n"
@@ -116,7 +160,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/calendar\n"
         "/finance 100\n"
         "/expense 50\n"
-        "/report\n"
+        "/report\n\n"
+        "COMERCIAL:\n"
         "/order pedido de camiseta\n"
         "/orders\n"
         "/orderstatus 1 em_producao\n"
@@ -131,15 +176,69 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/production camiseta cliente joao\n"
         "/productions\n"
         "/productionstatus 1 finalizado\n"
+        "/lead joao instagram\n"
+        "/leads\n"
+        "/leadstatus 1 convertido\n"
+        "/stage orçamento_enviado\n"
+        "/pipeline\n"
+        "/catalog camiseta 35\n"
+        "/cataloglist\n"
         "/backup\n"
         "/backups"
     )
 
+async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_post_instagram(" ".join(context.args) or "Street Graff"))
+
+async def story(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_story(" ".join(context.args) or "Street Graff"))
+
+async def reels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_reels(" ".join(context.args) or "Street Graff"))
+
+async def video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_roteiro_video(" ".join(context.args) or "Street Graff"))
+
+async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_prompt_imagem(" ".join(context.args) or "Street Graff"))
+
+async def venda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_texto_venda(" ".join(context.args) or "Street Graff"))
+
+async def campanha(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_campanha(" ".join(context.args) or "Street Graff"))
+
+async def workflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(executar_workflow(" ".join(context.args) or "Street Graff"))
+
+async def legenda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_legenda(" ".join(context.args) or "Street Graff"))
+
+async def hashtags(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_hashtags(" ".join(context.args) or "Street Graff"))
+
+async def grade(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_grade_conteudo(" ".join(context.args) or "Street Graff"))
+
+async def batch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_pacote_conteudo(" ".join(context.args) or "Street Graff"))
+
+async def batchreels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_pacote_reels(" ".join(context.args) or "Street Graff"))
+
+async def batchstories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(gerar_pacote_stories(" ".join(context.args) or "Street Graff"))
+
+async def produtos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_produtos())
+
+async def agentes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(agentes_conversando(" ".join(context.args) or "campanha Street Graff"))
+
 async def task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nome = " ".join(context.args)
-    resposta = criar_tarefa(nome)
     registrar_log("TASK", nome)
-    await update.message.reply_text(resposta)
+    await update.message.reply_text(criar_tarefa(nome))
 
 async def tasks_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_tarefas())
@@ -151,8 +250,7 @@ async def scheduler_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(executar_scheduler())
 
 async def client(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nome = " ".join(context.args)
-    await update.message.reply_text(criar_cliente(nome))
+    await update.message.reply_text(criar_cliente(" ".join(context.args)))
 
 async def clients_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_clientes())
@@ -196,9 +294,8 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nome = " ".join(context.args)
-    resposta = criar_pedido(nome)
     registrar_log("ORDER", nome)
-    await update.message.reply_text(resposta)
+    await update.message.reply_text(criar_pedido(nome))
 
 async def orders_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_pedidos())
@@ -208,13 +305,10 @@ async def orderstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use assim: /orderstatus 1 em_producao")
         return
 
-    pedido_id = context.args[0]
-    status = " ".join(context.args[1:])
-    await update.message.reply_text(atualizar_status_pedido(pedido_id, status))
+    await update.message.reply_text(atualizar_status_pedido(context.args[0], " ".join(context.args[1:])))
 
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    descricao = " ".join(context.args)
-    await update.message.reply_text(criar_orcamento(descricao))
+    await update.message.reply_text(criar_orcamento(" ".join(context.args)))
 
 async def quotes_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_orcamentos())
@@ -229,7 +323,7 @@ async def stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         quantidade = int(context.args[1])
     except ValueError:
-        await update.message.reply_text("A quantidade precisa ser número. Exemplo: /stock camiseta 10")
+        await update.message.reply_text("A quantidade precisa ser número.")
         return
 
     await update.message.reply_text(adicionar_estoque(item, quantidade))
@@ -250,15 +344,13 @@ async def notifications_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_notificacoes())
 
 async def supplier(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nome = " ".join(context.args)
-    await update.message.reply_text(criar_fornecedor(nome))
+    await update.message.reply_text(criar_fornecedor(" ".join(context.args)))
 
 async def suppliers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_fornecedores())
 
 async def production(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nome = " ".join(context.args)
-    await update.message.reply_text(criar_producao(nome))
+    await update.message.reply_text(criar_producao(" ".join(context.args)))
 
 async def productions_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_producao())
@@ -268,9 +360,7 @@ async def productionstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Use assim: /productionstatus 1 finalizado")
         return
 
-    producao_id = context.args[0]
-    status = " ".join(context.args[1:])
-    await update.message.reply_text(atualizar_producao(producao_id, status))
+    await update.message.reply_text(atualizar_producao(context.args[0], " ".join(context.args[1:])))
 
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(criar_backup())
@@ -278,18 +368,78 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def backups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(listar_backups())
 
+async def lead(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Use assim: /lead joao instagram")
+        return
+
+    nome = context.args[0]
+    origem = " ".join(context.args[1:]) or "manual"
+    await update.message.reply_text(criar_lead(nome, origem))
+
+async def leads_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_leads())
+
+async def leadstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /leadstatus 1 convertido")
+        return
+
+    await update.message.reply_text(atualizar_lead(context.args[0], " ".join(context.args[1:])))
+
+async def stage(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(criar_etapa(" ".join(context.args)))
+
+async def pipeline_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_pipeline())
+
+async def catalog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use assim: /catalog camiseta 35")
+        return
+
+    nome = context.args[0]
+
+    try:
+        preco = float(context.args[1].replace(",", "."))
+    except ValueError:
+        await update.message.reply_text("Preço inválido. Use: /catalog camiseta 35")
+        return
+
+    await update.message.reply_text(criar_item_catalogo(nome, preco))
+
+async def cataloglist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(listar_catalogo())
+
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem = update.message.text
     salvar_memoria(mensagem)
     registrar_evento("mensagem")
     registrar_log("MSG", mensagem)
-    resposta = resposta_free_ai(mensagem)
-    await update.message.reply_text(resposta)
+    await update.message.reply_text(resposta_free_ai(mensagem))
 
 async def telegram_main():
     telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     telegram_app.add_handler(CommandHandler("start", start))
+
+    telegram_app.add_handler(CommandHandler("post", post))
+    telegram_app.add_handler(CommandHandler("story", story))
+    telegram_app.add_handler(CommandHandler("reels", reels))
+    telegram_app.add_handler(CommandHandler("video", video))
+    telegram_app.add_handler(CommandHandler("imagem", imagem))
+    telegram_app.add_handler(CommandHandler("venda", venda))
+    telegram_app.add_handler(CommandHandler("campanha", campanha))
+    telegram_app.add_handler(CommandHandler("workflow", workflow))
+    telegram_app.add_handler(CommandHandler("legenda", legenda))
+    telegram_app.add_handler(CommandHandler("hashtags", hashtags))
+    telegram_app.add_handler(CommandHandler("grade", grade))
+    telegram_app.add_handler(CommandHandler("batch", batch))
+    telegram_app.add_handler(CommandHandler("batchreels", batchreels))
+    telegram_app.add_handler(CommandHandler("batchstories", batchstories))
+    telegram_app.add_handler(CommandHandler("produtos", produtos))
+    telegram_app.add_handler(CommandHandler("agentes", agentes))
+
     telegram_app.add_handler(CommandHandler("task", task))
     telegram_app.add_handler(CommandHandler("tasks", tasks_cmd))
     telegram_app.add_handler(CommandHandler("logs", logs_cmd))
@@ -301,6 +451,7 @@ async def telegram_main():
     telegram_app.add_handler(CommandHandler("finance", finance))
     telegram_app.add_handler(CommandHandler("expense", expense))
     telegram_app.add_handler(CommandHandler("report", report))
+
     telegram_app.add_handler(CommandHandler("order", order))
     telegram_app.add_handler(CommandHandler("orders", orders_cmd))
     telegram_app.add_handler(CommandHandler("orderstatus", orderstatus))
@@ -317,13 +468,22 @@ async def telegram_main():
     telegram_app.add_handler(CommandHandler("productionstatus", productionstatus))
     telegram_app.add_handler(CommandHandler("backup", backup))
     telegram_app.add_handler(CommandHandler("backups", backups))
+
+    telegram_app.add_handler(CommandHandler("lead", lead))
+    telegram_app.add_handler(CommandHandler("leads", leads_cmd))
+    telegram_app.add_handler(CommandHandler("leadstatus", leadstatus))
+    telegram_app.add_handler(CommandHandler("stage", stage))
+    telegram_app.add_handler(CommandHandler("pipeline", pipeline_cmd))
+    telegram_app.add_handler(CommandHandler("catalog", catalog))
+    telegram_app.add_handler(CommandHandler("cataloglist", cataloglist))
+
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V18 FREE...")
+    print("🔥 Telegram iniciando V19 FREE MEGA...")
     await telegram_app.initialize()
     await telegram_app.start()
     await telegram_app.updater.start_polling()
-    print("✅ Telegram ONLINE V18 FREE")
+    print("✅ Telegram ONLINE V19 FREE MEGA")
 
     await asyncio.Event().wait()
 
