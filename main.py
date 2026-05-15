@@ -22,35 +22,36 @@ from services.agent_service import agentes_conversando
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not TELEGRAM_TOKEN:
-    raise ValueError("TELEGRAM_TOKEN não encontrado.")
+    raise ValueError("TELEGRAM_TOKEN não encontrado nas variáveis de ambiente.")
 
-web = Flask(__name__)
+# IMPORTANTE: Railway/Gunicorn procura uma variável chamada app
+app = Flask(__name__)
 
 iniciar_banco()
 
-@web.route("/")
+@app.route("/")
 def home():
     return painel_admin()
 
-@web.route("/health")
+@app.route("/health")
 def health():
     return jsonify({
         "status": "online",
-        "version": "V11",
+        "version": "StreetCore OS V11",
         "telegram": "ativo",
         "flask": "ativo",
-        "services": "ativos"
+        "railway": "ativo"
     })
 
-@web.route("/analytics")
+@app.route("/analytics")
 def analytics():
     return jsonify(resumo_analytics())
 
-@web.route("/memory")
+@app.route("/memory")
 def memory():
     return jsonify({"memorias": listar_memorias()})
 
-@web.route("/api/workflow", methods=["POST"])
+@app.route("/api/workflow", methods=["POST"])
 def api_workflow():
     data = request.json or {}
     tema = data.get("tema", "Street Graff")
@@ -61,19 +62,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔥 STREETCORE OS V11 ONLINE\n\n"
         "Comandos:\n"
-        "/post - criar post\n"
-        "/story - criar story\n"
-        "/reels - criar reels\n"
-        "/video - roteiro de vídeo\n"
-        "/imagem - prompt de imagem\n"
-        "/venda - texto de venda\n"
-        "/campanha - campanha completa\n"
-        "/produtos - lista produtos\n"
-        "/agentes - agentes IA conversando\n"
-        "/workflow - workflow completo\n"
-        "/memoria - ver memória\n"
-        "/analytics - ver analytics\n"
-        "/status - status"
+        "/status\n"
+        "/post camisetas\n"
+        "/story adesivos\n"
+        "/reels canecas\n"
+        "/video street graff\n"
+        "/imagem camiseta personalizada\n"
+        "/venda adesivos\n"
+        "/campanha street graff\n"
+        "/produtos\n"
+        "/agentes campanha\n"
+        "/workflow street graff\n"
+        "/memoria\n"
+        "/analytics"
     )
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,11 +82,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ STREETCORE OS V11 ATIVO\n"
         "✅ Telegram online\n"
         "✅ Flask online\n"
-        "✅ Services conectados\n"
-        "✅ IA operacional\n"
-        "✅ Workflow ativo\n"
-        "✅ Analytics ativo\n"
-        "✅ Memória simples ativa"
+        "✅ Railway online\n"
+        "✅ Services conectados"
     )
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -147,33 +145,36 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem = update.message.text
     salvar_memoria(mensagem)
     registrar_evento("mensagem")
-    await update.message.reply_text(gerar_resposta_ia(mensagem))
-
-def run_flask():
-    port = int(os.getenv("PORT", 8080))
-    web.run(host="0.0.0.0", port=port)
+    resposta = gerar_resposta_ia(mensagem)
+    await update.message.reply_text(resposta)
 
 def run_telegram():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("post", post))
-    app.add_handler(CommandHandler("story", story))
-    app.add_handler(CommandHandler("reels", reels))
-    app.add_handler(CommandHandler("video", video))
-    app.add_handler(CommandHandler("imagem", imagem))
-    app.add_handler(CommandHandler("venda", venda))
-    app.add_handler(CommandHandler("campanha", campanha))
-    app.add_handler(CommandHandler("produtos", produtos))
-    app.add_handler(CommandHandler("agentes", agentes))
-    app.add_handler(CommandHandler("workflow", workflow))
-    app.add_handler(CommandHandler("memoria", memoria))
-    app.add_handler(CommandHandler("analytics", analytics_cmd))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("status", status))
+    telegram_app.add_handler(CommandHandler("post", post))
+    telegram_app.add_handler(CommandHandler("story", story))
+    telegram_app.add_handler(CommandHandler("reels", reels))
+    telegram_app.add_handler(CommandHandler("video", video))
+    telegram_app.add_handler(CommandHandler("imagem", imagem))
+    telegram_app.add_handler(CommandHandler("venda", venda))
+    telegram_app.add_handler(CommandHandler("campanha", campanha))
+    telegram_app.add_handler(CommandHandler("produtos", produtos))
+    telegram_app.add_handler(CommandHandler("agentes", agentes))
+    telegram_app.add_handler(CommandHandler("workflow", workflow))
+    telegram_app.add_handler(CommandHandler("memoria", memoria))
+    telegram_app.add_handler(CommandHandler("analytics", analytics_cmd))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    app.run_polling()
+    print("🔥 Telegram iniciando...")
+    telegram_app.run_polling(stop_signals=None)
 
-if __name__ == "__main__":
+# Inicia Telegram em segundo plano
+if TELEGRAM_TOKEN:
     threading.Thread(target=run_telegram, daemon=True).start()
-    run_flask()
+
+# Para rodar localmente
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
