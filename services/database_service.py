@@ -3,13 +3,10 @@ import sqlite3
 DB_PATH = "streetcore.db"
 
 def conectar():
-
     return sqlite3.connect(DB_PATH)
 
 def iniciar_banco():
-
     conn = conectar()
-
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -77,10 +74,43 @@ def iniciar_banco():
         )
     """)
 
-    conn.commit()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pedidos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            status TEXT DEFAULT 'novo',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orcamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao TEXT NOT NULL,
+            valor_estimado REAL NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS estoque (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item TEXT NOT NULL,
+            quantidade INTEGER NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notificacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mensagem TEXT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    conn.commit()
     conn.close()
 
-    print("✅ Banco SQLite V16 FREE iniciado.")
-
+    print("✅ Banco SQLite V17 FREE iniciado.")
     return True
