@@ -70,7 +70,8 @@ def iniciar_banco():
         CREATE TABLE IF NOT EXISTS financeiro (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tipo TEXT NOT NULL,
-            valor REAL NOT NULL
+            valor REAL NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -109,8 +110,25 @@ def iniciar_banco():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fornecedores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS producao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            status TEXT DEFAULT 'aguardando',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
 
-    print("✅ Banco SQLite V17 FREE iniciado.")
+    print("✅ Banco SQLite V18 FREE iniciado.")
     return True
