@@ -16,13 +16,14 @@ TASKS_FILE = "tasks.json"
 ROADMAPS_FILE = "roadmaps.json"
 AUTOMATIONS_FILE = "automations.json"
 CONTENT_FILE = "content.json"
+SALES_FILE = "sales.json"
 
 MASTER_PROMPT = """
 Você é StreetCore AI.
 Responda sempre em português.
 Use apenas ferramentas gratuitas ou plano grátis.
-Aja como CEO, COO, diretor criativo, growth hacker, social media, roteirista e engenheiro de automação.
-Explique passo a passo, com execução prática e estética premium.
+Aja como CEO, COO, diretor criativo, copywriter, vendedor, growth hacker, social media e engenheiro de automação.
+Explique passo a passo, com execução prática, premium e clara.
 """
 
 def load_json(file, default):
@@ -68,7 +69,7 @@ def ask_ai(prompt, memory=None):
             {"role": "user", "content": prompt}
         ],
         temperature=0.8,
-        max_tokens=3500
+        max_tokens=4000
     )
     return completion.choices[0].message.content
 
@@ -86,18 +87,27 @@ highly detailed.
     encoded = urllib.parse.quote(premium_prompt)
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed=77"
 
+def salvar_venda(tipo, tema, conteudo):
+    sales = load_json(SALES_FILE, [])
+    sales.append({
+        "tipo": tipo,
+        "tema": tema,
+        "conteudo": conteudo,
+        "data": str(datetime.now())
+    })
+    save_json(SALES_FILE, sales)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("""
 🔥 STREETCORE AI ONLINE
 
-COMANDOS:
+COMANDOS PRINCIPAIS:
 
 /status
 /memoria
 
 /projeto
 /projetos
-
 /tarefa
 /tarefas
 /check
@@ -105,7 +115,6 @@ COMANDOS:
 
 /roadmap
 /roadmaps
-
 /hoje
 /semana
 
@@ -124,6 +133,13 @@ COMANDOS:
 /calendario
 /campanha
 /conteudos
+
+/oferta
+/copy
+/funil
+/landing
+/whatsapp
+/vendas
 """)
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -133,6 +149,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     roadmaps = load_json(ROADMAPS_FILE, [])
     automations = load_json(AUTOMATIONS_FILE, [])
     contents = load_json(CONTENT_FILE, [])
+    sales = load_json(SALES_FILE, [])
 
     await update.message.reply_text(f"""
 🚀 STATUS
@@ -146,8 +163,9 @@ Tarefas: {len(tasks)}
 Roadmaps: {len(roadmaps)}
 Automações: {len(automations)}
 Conteúdos: {len(contents)}
+Vendas/Funis: {len(sales)}
 
-Modo: AGÊNCIA + CEO + AUTOMAÇÃO
+Modo: CEO + AGÊNCIA + VENDAS + AUTOMAÇÃO
 """)
 
 async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -155,7 +173,6 @@ async def memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not memory:
         await update.message.reply_text("Nenhuma memória salva.")
         return
-
     text = "🧠 MEMÓRIAS:\n\n"
     for key, value in memory.items():
         text += f"• {key}: {value}\n"
@@ -166,7 +183,6 @@ async def projeto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not nome:
         await update.message.reply_text("Use:\n/projeto nome")
         return
-
     projects = load_json(PROJECTS_FILE, [])
     projects.append({"nome": nome, "data": str(datetime.now())})
     save_json(PROJECTS_FILE, projects)
@@ -177,7 +193,6 @@ async def projetos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not projects:
         await update.message.reply_text("Nenhum projeto.")
         return
-
     text = "📁 PROJETOS:\n\n"
     for i, p in enumerate(projects, start=1):
         text += f"{i}. {p['nome']}\n"
@@ -188,7 +203,6 @@ async def tarefa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not nome:
         await update.message.reply_text("Use:\n/tarefa descrição")
         return
-
     tasks = load_json(TASKS_FILE, [])
     tasks.append({"tarefa": nome, "status": "pendente", "data": str(datetime.now())})
     save_json(TASKS_FILE, tasks)
@@ -199,7 +213,6 @@ async def tarefas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not tasks:
         await update.message.reply_text("Nenhuma tarefa.")
         return
-
     text = "📝 TAREFAS:\n\n"
     for i, t in enumerate(tasks, start=1):
         text += f"{i}. {t['tarefa']} — {t['status']}\n"
@@ -208,11 +221,9 @@ async def tarefas(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tasks = load_json(TASKS_FILE, [])
     pendentes = [(i, t) for i, t in enumerate(tasks, start=1) if t.get("status") == "pendente"]
-
     if not pendentes:
         await update.message.reply_text("🔥 Nenhuma pendência.")
         return
-
     text = "⚠️ PENDENTES:\n\n"
     for i, t in pendentes:
         text += f"{i}. {t['tarefa']}\n"
@@ -223,18 +234,15 @@ async def concluir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Use:\n/concluir número")
         return
-
     try:
         numero = int(context.args[0])
     except:
         await update.message.reply_text("Número inválido.")
         return
-
     tasks = load_json(TASKS_FILE, [])
     if numero < 1 or numero > len(tasks):
         await update.message.reply_text("Tarefa inexistente.")
         return
-
     tasks[numero - 1]["status"] = "concluída"
     save_json(TASKS_FILE, tasks)
     await update.message.reply_text("✅ Tarefa concluída.")
@@ -244,22 +252,14 @@ async def roadmap(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not objetivo:
         await update.message.reply_text("Use:\n/roadmap objetivo")
         return
-
     await update.message.reply_text("🧠 Criando roadmap...")
     resposta = ask_ai(f"""
 Crie um roadmap executivo completo para:
 
 {objetivo}
 
-Inclua:
-- estratégia;
-- execução;
-- monetização;
-- ferramentas grátis;
-- plano de 7 dias;
-- plano de 30 dias.
+Inclua estratégia, execução, monetização, ferramentas grátis, plano de 7 dias e plano de 30 dias.
 """, load_memory())
-
     roadmaps = load_json(ROADMAPS_FILE, [])
     roadmaps.append({"objetivo": objetivo, "conteudo": resposta, "data": str(datetime.now())})
     save_json(ROADMAPS_FILE, roadmaps)
@@ -270,7 +270,6 @@ async def roadmaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not roadmaps_list:
         await update.message.reply_text("Nenhum roadmap.")
         return
-
     text = "🗺 ROADMAPS:\n\n"
     for i, r in enumerate(roadmaps_list, start=1):
         text += f"{i}. {r['objetivo']}\n"
@@ -291,7 +290,6 @@ async def imagem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not prompt:
         await update.message.reply_text("Use:\n/imagem descrição")
         return
-
     await update.message.reply_text("🎨 Gerando imagem...")
     await update.message.reply_photo(photo=gerar_imagem_url(prompt))
 
@@ -300,7 +298,6 @@ async def logo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not prompt:
         await update.message.reply_text("Use:\n/logo marca")
         return
-
     await update.message.reply_text("🔥 Criando logo...")
     await update.message.reply_photo(photo=gerar_imagem_url(f"minimal futuristic luxury logo, premium streetwear branding, {prompt}"))
 
@@ -309,15 +306,7 @@ async def automacao(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not objetivo:
         await update.message.reply_text("Use:\n/automacao objetivo")
         return
-
-    resposta = ask_ai(f"""
-Crie uma automação gratuita para:
-
-{objetivo}
-
-Inclua ferramentas grátis, passo a passo, fluxo, execução e erros comuns.
-""", load_memory())
-
+    resposta = ask_ai(f"Crie uma automação gratuita para:\n{objetivo}\nInclua ferramentas grátis, passo a passo, fluxo, execução e erros comuns.", load_memory())
     automations = load_json(AUTOMATIONS_FILE, [])
     automations.append({"objetivo": objetivo, "conteudo": resposta, "data": str(datetime.now())})
     save_json(AUTOMATIONS_FILE, automations)
@@ -343,7 +332,6 @@ async def automacoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not automations:
         await update.message.reply_text("Nenhuma automação.")
         return
-
     text = "⚙️ AUTOMAÇÕES:\n\n"
     for i, a in enumerate(automations, start=1):
         text += f"{i}. {a['objetivo']}\n"
@@ -354,22 +342,7 @@ async def conteudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not tema:
         await update.message.reply_text("Use:\n/conteudo tema")
         return
-
-    resposta = ask_ai(f"""
-Crie um conteúdo viral premium para Instagram/TikTok sobre:
-
-{tema}
-
-Inclua:
-1. Gancho forte
-2. Texto principal
-3. Legenda
-4. CTA
-5. Hashtags
-6. Ideia visual
-7. Sugestão de imagem com IA gratuita
-""", load_memory())
-
+    resposta = ask_ai(f"Crie um conteúdo viral premium para Instagram/TikTok sobre:\n{tema}\nInclua gancho, texto, legenda, CTA, hashtags e ideia visual.", load_memory())
     contents = load_json(CONTENT_FILE, [])
     contents.append({"tipo": "conteudo", "tema": tema, "conteudo": resposta, "data": str(datetime.now())})
     save_json(CONTENT_FILE, contents)
@@ -377,108 +350,22 @@ Inclua:
 
 async def carrossel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/carrossel tema")
-        return
-
-    resposta = ask_ai(f"""
-Crie um carrossel viral para Instagram sobre:
-
-{tema}
-
-Estruture:
-Slide 1: capa com gancho
-Slides 2-6: conteúdo
-Slide 7: conclusão
-Slide 8: CTA
-Inclua legenda e direção visual premium.
-""", load_memory())
-
-    contents = load_json(CONTENT_FILE, [])
-    contents.append({"tipo": "carrossel", "tema": tema, "conteudo": resposta, "data": str(datetime.now())})
-    save_json(CONTENT_FILE, contents)
+    resposta = ask_ai(f"Crie um carrossel viral para Instagram sobre:\n{tema}\nEstruture slide por slide com legenda e direção visual.", load_memory())
     await update.message.reply_text(resposta)
 
 async def reels(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/reels tema")
-        return
-
-    resposta = ask_ai(f"""
-Crie um roteiro de Reels/TikTok viral sobre:
-
-{tema}
-
-Inclua:
-1. Hook de 3 segundos
-2. Cena por cena
-3. Texto na tela
-4. Narração
-5. B-roll
-6. CTA
-7. Prompt de vídeo IA gratuito/alternativo
-""", load_memory())
-
-    contents = load_json(CONTENT_FILE, [])
-    contents.append({"tipo": "reels", "tema": tema, "conteudo": resposta, "data": str(datetime.now())})
-    save_json(CONTENT_FILE, contents)
+    resposta = ask_ai(f"Crie um roteiro de Reels/TikTok viral sobre:\n{tema}\nInclua hook, cena por cena, narração, texto na tela e CTA.", load_memory())
     await update.message.reply_text(resposta)
 
 async def calendario(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/calendario tema ou nicho")
-        return
-
-    resposta = ask_ai(f"""
-Crie um calendário de conteúdo de 30 dias para:
-
-{tema}
-
-Formato:
-Dia 1 até Dia 30.
-Para cada dia:
-- tema;
-- formato;
-- gancho;
-- CTA;
-- ideia visual;
-- ferramenta grátis sugerida.
-""", load_memory())
-
-    contents = load_json(CONTENT_FILE, [])
-    contents.append({"tipo": "calendario", "tema": tema, "conteudo": resposta, "data": str(datetime.now())})
-    save_json(CONTENT_FILE, contents)
+    resposta = ask_ai(f"Crie um calendário de conteúdo de 30 dias para:\n{tema}\nInclua tema, formato, gancho, CTA e ferramenta grátis por dia.", load_memory())
     await update.message.reply_text(resposta)
 
 async def campanha(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/campanha produto ou marca")
-        return
-
-    resposta = ask_ai(f"""
-Crie uma campanha premium completa para:
-
-{tema}
-
-Inclua:
-1. Conceito central
-2. Público-alvo
-3. Oferta
-4. Mensagem principal
-5. 5 posts
-6. 3 Reels
-7. 1 carrossel
-8. Ideias visuais
-9. Funil grátis
-10. Plano de execução de 7 dias
-""", load_memory())
-
-    contents = load_json(CONTENT_FILE, [])
-    contents.append({"tipo": "campanha", "tema": tema, "conteudo": resposta, "data": str(datetime.now())})
-    save_json(CONTENT_FILE, contents)
+    resposta = ask_ai(f"Crie uma campanha premium completa para:\n{tema}\nInclua conceito, público, oferta, posts, reels, funil grátis e plano de 7 dias.", load_memory())
     await update.message.reply_text(resposta)
 
 async def conteudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -486,17 +373,161 @@ async def conteudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not contents:
         await update.message.reply_text("Nenhum conteúdo salvo.")
         return
-
     text = "📲 CONTEÚDOS SALVOS:\n\n"
     for i, c in enumerate(contents, start=1):
         text += f"{i}. {c['tipo']} — {c['tema']}\n"
+    await update.message.reply_text(text)
+
+async def oferta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    produto = " ".join(context.args)
+    if not produto:
+        await update.message.reply_text("Use:\n/oferta produto ou serviço")
+        return
+
+    resposta = ask_ai(f"""
+Crie uma OFERTA IRRESISTÍVEL para:
+
+{produto}
+
+Inclua:
+1. Público-alvo
+2. Dor principal
+3. Promessa forte
+4. Mecanismo único
+5. Benefícios
+6. Bônus gratuitos
+7. Garantia sem custo
+8. Urgência ética
+9. Preço sugerido
+10. Oferta final pronta
+""", load_memory())
+
+    salvar_venda("oferta", produto, resposta)
+    await update.message.reply_text(resposta)
+
+async def copy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    produto = " ".join(context.args)
+    if not produto:
+        await update.message.reply_text("Use:\n/copy produto ou serviço")
+        return
+
+    resposta = ask_ai(f"""
+Crie uma copy de vendas premium para:
+
+{produto}
+
+Estrutura:
+1. Headline
+2. Subheadline
+3. Problema
+4. Agitação da dor
+5. Solução
+6. Benefícios
+7. Prova/autoridade
+8. Oferta
+9. CTA forte
+10. Versão curta para anúncio
+""", load_memory())
+
+    salvar_venda("copy", produto, resposta)
+    await update.message.reply_text(resposta)
+
+async def funil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    produto = " ".join(context.args)
+    if not produto:
+        await update.message.reply_text("Use:\n/funil produto ou serviço")
+        return
+
+    resposta = ask_ai(f"""
+Crie um FUNIL DE VENDAS usando apenas ferramentas gratuitas/plano grátis para:
+
+{produto}
+
+Inclua:
+1. Fonte de tráfego grátis
+2. Conteúdo de atração
+3. Isca digital gratuita
+4. Captura de lead grátis
+5. Sequência de nutrição
+6. Oferta
+7. Follow-up
+8. Automação possível
+9. Ferramentas grátis
+10. Plano de implantação em 7 dias
+""", load_memory())
+
+    salvar_venda("funil", produto, resposta)
+    await update.message.reply_text(resposta)
+
+async def landing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    produto = " ".join(context.args)
+    if not produto:
+        await update.message.reply_text("Use:\n/landing produto ou serviço")
+        return
+
+    resposta = ask_ai(f"""
+Crie uma landing page completa para:
+
+{produto}
+
+Inclua:
+1. Hero section
+2. Headline
+3. Subheadline
+4. Benefícios
+5. Como funciona
+6. Provas
+7. Oferta
+8. FAQ
+9. CTA
+10. Código HTML simples gratuito
+""", load_memory())
+
+    salvar_venda("landing", produto, resposta)
+    await update.message.reply_text(resposta)
+
+async def whatsapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    produto = " ".join(context.args)
+    if not produto:
+        await update.message.reply_text("Use:\n/whatsapp produto ou serviço")
+        return
+
+    resposta = ask_ai(f"""
+Crie uma sequência de mensagens de WhatsApp para vender:
+
+{produto}
+
+Inclua:
+1. Primeira abordagem
+2. Quebra de gelo
+3. Diagnóstico
+4. Apresentação da solução
+5. Quebra de objeções
+6. Fechamento
+7. Follow-up 1
+8. Follow-up 2
+9. Mensagem final
+10. Tom natural, humano e direto
+""", load_memory())
+
+    salvar_venda("whatsapp", produto, resposta)
+    await update.message.reply_text(resposta)
+
+async def vendas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sales = load_json(SALES_FILE, [])
+    if not sales:
+        await update.message.reply_text("Nenhuma estratégia de venda salva.")
+        return
+
+    text = "💰 VENDAS/FUNIS SALVOS:\n\n"
+    for i, s in enumerate(sales, start=1):
+        text += f"{i}. {s['tipo']} — {s['tema']}\n"
     await update.message.reply_text(text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     memory = load_memory()
     auto_memory(user_message, memory)
-
     resposta = ask_ai(user_message, memory)
     await update.message.reply_text(resposta)
 
@@ -508,7 +539,6 @@ app.add_handler(CommandHandler("memoria", memoria))
 
 app.add_handler(CommandHandler("projeto", projeto))
 app.add_handler(CommandHandler("projetos", projetos))
-
 app.add_handler(CommandHandler("tarefa", tarefa))
 app.add_handler(CommandHandler("tarefas", tarefas))
 app.add_handler(CommandHandler("check", check))
@@ -516,7 +546,6 @@ app.add_handler(CommandHandler("concluir", concluir))
 
 app.add_handler(CommandHandler("roadmap", roadmap))
 app.add_handler(CommandHandler("roadmaps", roadmaps))
-
 app.add_handler(CommandHandler("hoje", hoje))
 app.add_handler(CommandHandler("semana", semana))
 
@@ -536,7 +565,14 @@ app.add_handler(CommandHandler("calendario", calendario))
 app.add_handler(CommandHandler("campanha", campanha))
 app.add_handler(CommandHandler("conteudos", conteudos))
 
+app.add_handler(CommandHandler("oferta", oferta))
+app.add_handler(CommandHandler("copy", copy))
+app.add_handler(CommandHandler("funil", funil))
+app.add_handler(CommandHandler("landing", landing))
+app.add_handler(CommandHandler("whatsapp", whatsapp))
+app.add_handler(CommandHandler("vendas", vendas))
+
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("🔥 STREETCORE AI CONTENT MODE ONLINE")
+print("🔥 STREETCORE AI SALES FUNNEL MODE ONLINE")
 app.run_polling()
