@@ -20,7 +20,8 @@ FILES = {
     "sales": "sales.json",
     "branding": "branding.json",
     "products": "products.json",
-    "dev": "dev.json"
+    "dev": "dev.json",
+    "docs": "docs.json"
 }
 
 MASTER_PROMPT = """
@@ -28,7 +29,8 @@ Você é StreetCore AI.
 Responda sempre em português.
 Use apenas ferramentas gratuitas ou plano grátis.
 Aja como CEO, COO, diretor criativo, estrategista, copywriter, vendedor, social media,
-growth hacker, arquiteto de SaaS, programador full-stack, engenheiro de automação e operador técnico.
+growth hacker, arquiteto de SaaS, programador full-stack, engenheiro de automação,
+consultor de negócios e operador técnico.
 Explique passo a passo, como se estivesse pegando na mão do usuário.
 Sempre entregue execução prática, premium e clara.
 """
@@ -88,8 +90,9 @@ async def send_long(update, text):
         await update.message.reply_text(text[i:i+3900])
 
 def gerar_imagem_url(prompt):
-    premium_prompt = f"ultra realistic cinematic image, street luxury futuristic aesthetic, cyberpunk executive style, premium lighting, 8k, highly detailed. {prompt}"
-    encoded = urllib.parse.quote(premium_prompt)
+    encoded = urllib.parse.quote(
+        f"ultra realistic cinematic image, street luxury futuristic aesthetic, cyberpunk executive style, premium lighting, 8k, highly detailed. {prompt}"
+    )
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&seed=77"
 
 async def ai_save(update, file, tipo, tema, prompt):
@@ -114,9 +117,9 @@ async def start(update, context):
     await update.message.reply_text("""
 🔥 STREETCORE AI ONLINE
 
-NOVO MODO: DEV / PROGRAMAÇÃO
+NOVO MODO: ARQUIVOS / DOCUMENTOS
 
-Comandos principais:
+Comandos:
 /status /memoria
 /projeto /projetos
 /tarefa /tarefas /check /concluir
@@ -127,17 +130,16 @@ Comandos principais:
 /oferta /copy /funil /landing /whatsapp /vendas
 /branding /paleta /tomvoz /manifesto /brandbook /identidade /brandings
 /ideia /validar /mvp /features /saas /produto /lancamento /produtos
+/site /app /api /banco /deploy /github /debug /arquitetura /devs
 
-DEV:
-/site
-/app
-/api
-/banco
-/deploy
-/github
-/debug
-/arquitetura
-/devs
+DOCUMENTOS:
+/doc
+/proposta
+/contrato
+/briefing
+/plano
+/email
+/arquivos
 """)
 
 async def status(update, context):
@@ -154,8 +156,9 @@ Vendas: {len(load_json(FILES["sales"], []))}
 Brandings: {len(load_json(FILES["branding"], []))}
 Produtos/SaaS: {len(load_json(FILES["products"], []))}
 DEV: {len(load_json(FILES["dev"], []))}
+Arquivos/Docs: {len(load_json(FILES["docs"], []))}
 
-Modo: CEO + AGÊNCIA + SAAS + DEV
+Modo: CEO + AGÊNCIA + SAAS + DEV + DOCUMENTOS
 """)
 
 async def memoria(update, context):
@@ -170,14 +173,9 @@ async def memoria(update, context):
 
 async def projeto(update, context):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/projeto nome")
-        return
-    salvar(FILES["projects"], "projeto", tema, tema)
-    await update.message.reply_text(f"✅ Projeto criado:\n{tema}")
+    await ai_save(update, FILES["projects"], "projeto", tema, f"Crie estrutura inicial de projeto para: {tema}")
 
-async def projetos(update, context):
-    await listar(update, FILES["projects"], "📁 PROJETOS")
+async def projetos(update, context): await listar(update, FILES["projects"], "📁 PROJETOS")
 
 async def tarefa(update, context):
     nome = " ".join(context.args)
@@ -228,6 +226,19 @@ async def concluir(update, context):
     save_json(FILES["tasks"], tasks)
     await update.message.reply_text("✅ Tarefa concluída.")
 
+async def simple_command(update, context, file_key, tipo, prompt_base):
+    tema = " ".join(context.args)
+    await ai_save(update, FILES[file_key], tipo, tema, f"{prompt_base}\n\nTema:\n{tema}")
+
+async def roadmap(update, context): await simple_command(update, context, "roadmaps", "roadmap", "Crie roadmap executivo completo com estratégia, execução, monetização, ferramentas grátis, plano de 7 dias e plano de 30 dias.")
+async def roadmaps(update, context): await listar(update, FILES["roadmaps"], "🗺 ROADMAPS")
+async def hoje(update, context):
+    resposta = ask_ai(f"Crie plano executivo para hoje com base nestas tarefas:\n{load_json(FILES['tasks'], [])}", load_memory())
+    await send_long(update, resposta)
+async def semana(update, context):
+    resposta = ask_ai(f"Crie plano semanal executivo com base nestas tarefas:\n{load_json(FILES['tasks'], [])}", load_memory())
+    await send_long(update, resposta)
+
 async def imagem(update, context):
     prompt = " ".join(context.args)
     if not prompt:
@@ -238,51 +249,28 @@ async def imagem(update, context):
 
 async def logo(update, context):
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use:\n/logo marca")
-        return
     await update.message.reply_text("🔥 Criando logo...")
     await update.message.reply_photo(photo=gerar_imagem_url(f"minimal futuristic luxury logo, premium streetwear branding, white background, {tema}"))
 
-async def simple_command(update, context, file_key, tipo, prompt_base):
-    tema = " ".join(context.args)
-    await ai_save(update, FILES[file_key], tipo, tema, f"{prompt_base}\n\nTema:\n{tema}")
-
-async def roadmap(update, context):
-    await simple_command(update, context, "roadmaps", "roadmap", "Crie roadmap executivo completo. Inclua estratégia, execução, monetização, ferramentas grátis, plano de 7 dias e 30 dias.")
-
-async def roadmaps(update, context): await listar(update, FILES["roadmaps"], "🗺 ROADMAPS")
-async def automacoes(update, context): await listar(update, FILES["automations"], "⚙️ AUTOMAÇÕES")
-async def conteudos(update, context): await listar(update, FILES["content"], "📲 CONTEÚDOS")
-async def vendas(update, context): await listar(update, FILES["sales"], "💰 VENDAS")
-async def brandings(update, context): await listar(update, FILES["branding"], "🎯 BRANDINGS")
-async def produtos(update, context): await listar(update, FILES["products"], "🧩 PRODUTOS / SAAS")
-async def devs(update, context): await listar(update, FILES["dev"], "💻 DEV / PROGRAMAÇÃO")
-
-async def hoje(update, context):
-    resposta = ask_ai(f"Crie plano executivo para hoje com base nestas tarefas:\n{load_json(FILES['tasks'], [])}", load_memory())
-    await send_long(update, resposta)
-
-async def semana(update, context):
-    resposta = ask_ai(f"Crie plano semanal executivo com base nestas tarefas:\n{load_json(FILES['tasks'], [])}", load_memory())
-    await send_long(update, resposta)
-
-async def automacao(update, context): await simple_command(update, context, "automations", "automacao", "Crie automação gratuita. Inclua ferramentas grátis, passo a passo, fluxo, execução e erros comuns.")
+async def automacao(update, context): await simple_command(update, context, "automations", "automacao", "Crie automação gratuita com ferramentas grátis, passo a passo, fluxo, execução e erros comuns.")
 async def fluxo(update, context): await simple_command(update, context, "automations", "fluxo", "Crie fluxo operacional gratuito no formato INÍCIO → ETAPA → FINAL.")
-async def script(update, context): await simple_command(update, context, "automations", "script", "Crie script Python gratuito. Inclua código completo e como rodar.")
+async def script(update, context): await simple_command(update, context, "automations", "script", "Crie script Python gratuito com código completo e como rodar.")
 async def checklist(update, context): await simple_command(update, context, "automations", "checklist", "Crie checklist operacional completo.")
+async def automacoes(update, context): await listar(update, FILES["automations"], "⚙️ AUTOMAÇÕES")
 
-async def conteudo(update, context): await simple_command(update, context, "content", "conteudo", "Crie conteúdo viral premium para Instagram/TikTok. Inclua gancho, texto, legenda, CTA, hashtags e ideia visual.")
+async def conteudo(update, context): await simple_command(update, context, "content", "conteudo", "Crie conteúdo viral premium para Instagram/TikTok com gancho, texto, legenda, CTA, hashtags e ideia visual.")
 async def carrossel(update, context): await simple_command(update, context, "content", "carrossel", "Crie carrossel viral para Instagram, slide por slide, com legenda e direção visual.")
 async def reels(update, context): await simple_command(update, context, "content", "reels", "Crie roteiro de Reels/TikTok viral com hook, cenas, narração, texto na tela e CTA.")
 async def calendario(update, context): await simple_command(update, context, "content", "calendario", "Crie calendário de conteúdo de 30 dias com tema, formato, gancho, CTA e ferramenta grátis por dia.")
 async def campanha(update, context): await simple_command(update, context, "content", "campanha", "Crie campanha premium completa com conceito, público, oferta, posts, reels, funil grátis e plano de 7 dias.")
+async def conteudos(update, context): await listar(update, FILES["content"], "📲 CONTEÚDOS")
 
 async def oferta(update, context): await simple_command(update, context, "sales", "oferta", "Crie oferta irresistível com público, dor, promessa, mecanismo único, bônus, urgência ética, preço sugerido e oferta final.")
 async def copy(update, context): await simple_command(update, context, "sales", "copy", "Crie copy de vendas premium com headline, subheadline, problema, solução, benefícios, prova, oferta e CTA.")
 async def funil(update, context): await simple_command(update, context, "sales", "funil", "Crie funil de vendas grátis com tráfego grátis, isca, captura, nutrição, oferta, follow-up, automação e plano de 7 dias.")
 async def landing(update, context): await simple_command(update, context, "sales", "landing", "Crie landing page completa com hero, headline, benefícios, oferta, FAQ, CTA e HTML simples.")
 async def whatsapp(update, context): await simple_command(update, context, "sales", "whatsapp", "Crie sequência de WhatsApp para vender com abordagem, diagnóstico, solução, objeções, fechamento e follow-ups.")
+async def vendas(update, context): await listar(update, FILES["sales"], "💰 VENDAS")
 
 async def branding(update, context): await simple_command(update, context, "branding", "branding", "Crie estratégia completa de branding premium com essência, posicionamento, público, personalidade, promessa, diferencial, arquétipo, visual, tom de voz e próximos passos.")
 async def paleta(update, context): await simple_command(update, context, "branding", "paleta", "Crie paleta de cores premium com HEX, psicologia das cores e aplicação.")
@@ -290,6 +278,7 @@ async def tomvoz(update, context): await simple_command(update, context, "brandi
 async def manifesto(update, context): await simple_command(update, context, "branding", "manifesto", "Crie manifesto cinematográfico, forte e premium.")
 async def brandbook(update, context): await simple_command(update, context, "branding", "brandbook", "Crie mini brand book completo com missão, visão, valores, público, posicionamento, paleta, tipografia gratuita, tom de voz e regras.")
 async def identidade(update, context): await simple_command(update, context, "branding", "identidade", "Crie identidade visual completa com logo ideal, símbolos, paleta, tipografia gratuita, fotos, posts, embalagem e prompts.")
+async def brandings(update, context): await listar(update, FILES["branding"], "🎯 BRANDINGS")
 
 async def ideia(update, context): await simple_command(update, context, "products", "ideia", "Crie 10 ideias de produto digital/SaaS com nome, problema, público, MVP grátis, monetização, dificuldade e potencial.")
 async def validar(update, context): await simple_command(update, context, "products", "validar", "Crie plano de validação gratuito com hipótese, público, perguntas, onde achar pessoas, landing, oferta teste, métricas e plano de 7 dias.")
@@ -298,126 +287,117 @@ async def features(update, context): await simple_command(update, context, "prod
 async def saas(update, context): await simple_command(update, context, "products", "saas", "Crie arquitetura completa de SaaS gratuito/plano grátis com nome, proposta, público, features, stack, banco, login, dashboard, monetização e roadmap.")
 async def produto(update, context): await simple_command(update, context, "products", "produto", "Crie produto digital completo com nome, promessa, público, entregável, módulos, bônus, preço, página de venda, funil e lançamento.")
 async def lancamento(update, context): await simple_command(update, context, "products", "lancamento", "Crie plano de lançamento gratuito com pré-lançamento, conteúdo, oferta, posts, reels, WhatsApp, página, lançamento e pós.")
+async def produtos(update, context): await listar(update, FILES["products"], "🧩 PRODUTOS / SAAS")
 
-async def site(update, context):
-    await simple_command(update, context, "dev", "site", """
-Crie um site completo e gratuito.
+async def site(update, context): await simple_command(update, context, "dev", "site", "Crie site completo gratuito com estrutura, copy, design, HTML + CSS completo, teste e publicação grátis no GitHub Pages.")
+async def app_cmd(update, context): await simple_command(update, context, "dev", "app", "Crie app simples gratuito com funcionalidades, telas, fluxo, stack grátis, código inicial e como rodar.")
+async def api(update, context): await simple_command(update, context, "dev", "api", "Crie API gratuita com endpoints, dados, código FastAPI, requirements.txt, como rodar e publicar grátis.")
+async def banco(update, context): await simple_command(update, context, "dev", "banco", "Crie estrutura de banco de dados grátis com entidades, tabelas, campos, relacionamentos, SQL e Supabase grátis.")
+async def deploy(update, context): await simple_command(update, context, "dev", "deploy", "Crie plano de deploy gratuito com hospedagem grátis, passo a passo, variáveis, GitHub, logs e correções.")
+async def github(update, context): await simple_command(update, context, "dev", "github", "Explique como configurar GitHub para este projeto com repositório, arquivos, commit, deploy e cuidados.")
+async def debug(update, context): await simple_command(update, context, "dev", "debug", "Analise e corrija erro/código/problema. Explique erro, causa, correção exata, código corrigido e teste.")
+async def arquitetura(update, context): await simple_command(update, context, "dev", "arquitetura", "Crie arquitetura técnica completa com frontend, backend, banco, auth, APIs, deploy grátis, segurança e roadmap.")
+async def devs(update, context): await listar(update, FILES["dev"], "💻 DEV / PROGRAMAÇÃO")
 
-Inclua:
-1. Objetivo do site
-2. Estrutura das páginas
-3. Copy principal
-4. Design visual
-5. Código HTML + CSS completo em um único arquivo
-6. Como testar no navegador
-7. Como publicar grátis no GitHub Pages
-8. Próximo passo
-""")
-
-async def app_cmd(update, context):
-    await simple_command(update, context, "dev", "app", """
-Crie um app simples gratuito.
+async def doc(update, context):
+    await simple_command(update, context, "docs", "doc", """
+Crie um documento profissional completo.
 
 Inclua:
-1. Ideia do app
-2. Funcionalidades
-3. Telas
-4. Fluxo do usuário
-5. Stack grátis recomendada
-6. Código inicial
-7. Como rodar
-8. Como evoluir
+1. Título
+2. Objetivo
+3. Contexto
+4. Estrutura organizada
+5. Conteúdo principal
+6. Conclusão
+7. Próximos passos
+8. Versão pronta para copiar
 """)
 
-async def api(update, context):
-    await simple_command(update, context, "dev", "api", """
-Crie uma API gratuita.
+async def proposta(update, context):
+    await simple_command(update, context, "docs", "proposta", """
+Crie uma proposta comercial profissional.
 
 Inclua:
-1. Objetivo da API
-2. Endpoints
-3. Estrutura dos dados
-4. Código completo em Python FastAPI
-5. requirements.txt
-6. Como rodar localmente
-7. Como publicar grátis
-8. Próxima melhoria
+1. Título
+2. Apresentação
+3. Problema do cliente
+4. Solução proposta
+5. Entregáveis
+6. Cronograma
+7. Investimento sugerido
+8. Condições
+9. Próximos passos
+10. Texto pronto para enviar
 """)
 
-async def banco(update, context):
-    await simple_command(update, context, "dev", "banco", """
-Crie estrutura de banco de dados grátis.
+async def contrato(update, context):
+    await simple_command(update, context, "docs", "contrato", """
+Crie um modelo simples de contrato.
+
+Importante:
+- informe que é um modelo inicial e não substitui advogado.
+Inclua:
+1. Partes
+2. Objeto
+3. Entregáveis
+4. Prazo
+5. Pagamento
+6. Responsabilidades
+7. Cancelamento
+8. Confidencialidade
+9. Assinaturas
+""")
+
+async def briefing(update, context):
+    await simple_command(update, context, "docs", "briefing", """
+Crie um briefing profissional.
 
 Inclua:
-1. Entidades
-2. Tabelas
-3. Campos
-4. Relacionamentos
-5. SQL completo
-6. Opção Supabase grátis
-7. Como criar passo a passo
-8. Cuidados
+1. Objetivo
+2. Público-alvo
+3. Problema
+4. Referências
+5. Estilo visual
+6. Tom de voz
+7. Entregáveis
+8. Prazos
+9. Perguntas importantes
+10. Checklist final
 """)
 
-async def deploy(update, context):
-    await simple_command(update, context, "dev", "deploy", """
-Crie plano de deploy gratuito.
+async def plano(update, context):
+    await simple_command(update, context, "docs", "plano", """
+Crie um plano estratégico completo.
 
 Inclua:
-1. Melhor hospedagem grátis
-2. Passo a passo
-3. Variáveis de ambiente
-4. GitHub
-5. Logs
-6. Como testar
-7. Como corrigir erros comuns
+1. Objetivo principal
+2. Diagnóstico
+3. Estratégia
+4. Etapas
+5. Cronograma
+6. Recursos gratuitos
+7. Riscos
+8. Métricas
+9. Próximo passo imediato
 """)
 
-async def github(update, context):
-    await simple_command(update, context, "dev", "github", """
-Explique como configurar GitHub para este projeto.
+async def email(update, context):
+    await simple_command(update, context, "docs", "email", """
+Crie um e-mail profissional.
 
 Inclua:
-1. Criar repositório
-2. Criar arquivos
-3. Commit
-4. Conectar deploy
-5. Atualizar projeto
-6. Cuidados para iniciante
+1. Assunto
+2. Saudação
+3. Mensagem principal
+4. CTA
+5. Encerramento
+6. Versão curta
+7. Versão mais persuasiva
 """)
 
-async def debug(update, context):
-    tema = " ".join(context.args)
-    await ai_save(update, FILES["dev"], "debug", tema, f"""
-Analise e corrija este erro/código/problema:
-
-{tema}
-
-Responda com:
-1. O que está errado
-2. Por que deu erro
-3. Correção exata
-4. Código corrigido se possível
-5. Como testar
-6. Como evitar no futuro
-""")
-
-async def arquitetura(update, context):
-    await simple_command(update, context, "dev", "arquitetura", """
-Crie arquitetura técnica completa.
-
-Inclua:
-1. Visão geral
-2. Frontend
-3. Backend
-4. Banco de dados
-5. Autenticação
-6. APIs
-7. Deploy grátis
-8. Segurança básica
-9. Escalabilidade
-10. Roadmap técnico
-""")
+async def arquivos(update, context):
+    await listar(update, FILES["docs"], "📄 ARQUIVOS / DOCUMENTOS")
 
 async def handle_message(update, context):
     user_message = update.message.text
@@ -439,7 +419,8 @@ commands = {
     "oferta": oferta, "copy": copy, "funil": funil, "landing": landing, "whatsapp": whatsapp, "vendas": vendas,
     "branding": branding, "paleta": paleta, "tomvoz": tomvoz, "manifesto": manifesto, "brandbook": brandbook, "identidade": identidade, "brandings": brandings,
     "ideia": ideia, "validar": validar, "mvp": mvp, "features": features, "saas": saas, "produto": produto, "lancamento": lancamento, "produtos": produtos,
-    "site": site, "app": app_cmd, "api": api, "banco": banco, "deploy": deploy, "github": github, "debug": debug, "arquitetura": arquitetura, "devs": devs
+    "site": site, "app": app_cmd, "api": api, "banco": banco, "deploy": deploy, "github": github, "debug": debug, "arquitetura": arquitetura, "devs": devs,
+    "doc": doc, "proposta": proposta, "contrato": contrato, "briefing": briefing, "plano": plano, "email": email, "arquivos": arquivos
 }
 
 for name, func in commands.items():
@@ -447,5 +428,5 @@ for name, func in commands.items():
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("🔥 STREETCORE AI DEV MODE ONLINE")
+print("🔥 STREETCORE AI DOCUMENT MODE ONLINE")
 app.run_polling()
