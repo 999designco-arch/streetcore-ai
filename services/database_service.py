@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 DB_PATH = "streetcore.db"
 
@@ -26,8 +25,16 @@ def iniciar_banco():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS conhecimento (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            texto TEXT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
 
-    print("✅ Banco SQLite V12 FREE iniciado.")
+    print("✅ Banco SQLite V14 FREE iniciado.")
     return True
