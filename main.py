@@ -29,7 +29,7 @@ except Exception:
 
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v35-neural-empire")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v36-autonomous-empire")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 API_KEY = os.getenv("STREETCORE_API_KEY", "streetcore-api")
@@ -220,6 +220,49 @@ TABLES = {
         status TEXT DEFAULT 'aguardando_aprovacao',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
+    "workflows": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        gatilho TEXT,
+        acao TEXT,
+        status TEXT DEFAULT 'ativo',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "voz": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        arquivo TEXT,
+        transcricao TEXT,
+        resposta TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "imagem_jobs": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tema TEXT,
+        prompt TEXT,
+        status TEXT DEFAULT 'prompt_criado',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "video_jobs": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tema TEXT,
+        roteiro TEXT,
+        status TEXT DEFAULT 'roteiro_criado',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "empresas": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        nicho TEXT,
+        status TEXT DEFAULT 'ativa',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "analytics": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT,
+        valor TEXT,
+        observacao TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -289,7 +332,7 @@ def iniciar_banco():
                 (nome, funcao, "Aguardando primeira execução.")
             )
 
-    print("✅ StreetCore OS V35 NEURAL EMPIRE iniciado.")
+    print("✅ StreetCore OS V37 SINGULARITY CORE iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -736,15 +779,106 @@ def scheduler_loop():
         time.sleep(60)
 
 
+
+
+def gerar_prompt_imagem(tema):
+    prompt = f"""Arte publicitária profissional para Street Graff sobre {tema}, estilo urbano, alto contraste, visual streetwear, fundo preto, detalhes brancos, produto em destaque, composição premium para Instagram, sem texto pequeno, qualidade de anúncio."""
+    inserir("imagem_jobs", "tema, prompt, status", (tema, prompt, "prompt_criado"))
+    return prompt
+
+
+def gerar_roteiro_video(tema):
+    roteiro = f"""🎥 ROTEIRO VÍDEO IA - {tema.upper()}
+
+0-2s: Gancho forte: \"Sua marca ainda passa despercebida?\"
+3-6s: Mostrar produto personalizado da Street Graff.
+7-11s: Mostrar bastidor/produção/detalhe.
+12-16s: Mostrar resultado final.
+17-20s: CTA: \"Chama no direct e peça seu orçamento.\"
+
+Estilo: TikTok/Reels, cortes rápidos, música urbana, legenda grande, energia de venda."""
+    inserir("video_jobs", "tema, roteiro, status", (tema, roteiro, "roteiro_criado"))
+    return roteiro
+
+
+def operador_ia(comando):
+    analise = conselho_multiagentes(comando)
+    tema = comando or "Street Graff"
+    texto_post = post(tema)
+    proposta_auto = gerar_proposta("Lead automático", tema)
+    inserir("tarefas", "titulo, status, prioridade", (f"Executar operador IA: {tema}", "pendente", "alta"))
+    inserir("conteudos", "tema, tipo, texto, status", (tema, "operador_post", texto_post, "rascunho"))
+    inserir("instagram_queue", "tipo, conteudo, legenda, status", ("post", texto_post, "Legenda criada pelo Operador IA", "aguardando_aprovacao"))
+    return f"""⚡ OPERADOR IA EXECUTADO
+
+Comando: {comando}
+
+Ações criadas:
+✅ tarefa operacional
+✅ post em rascunho
+✅ fila Instagram
+✅ análise multiagentes
+
+--- ANÁLISE ---
+{analise}
+
+--- PROPOSTA BASE ---
+{proposta_auto}"""
+
+
+def criar_workflow_padrao():
+    inserir("workflows", "nome, gatilho, acao, status", (
+        "Novo lead para proposta",
+        "novo_lead",
+        "criar_proposta + criar_tarefa_followup + criar_conteudo",
+        "ativo"
+    ))
+    return "Workflow padrão criado: novo lead → proposta → follow-up → conteúdo."
+
+
+def executar_workflows():
+    leads = sql("SELECT id,nome,origem,temperatura FROM leads WHERE temperatura IN ('quente','morno') ORDER BY id DESC LIMIT 5", fetch=True)
+    total = 0
+    for lead in leads:
+        lead_id, nome, origem, temp = lead
+        desc = f"Orçamento personalizado para {nome} vindo de {origem}"
+        texto = gerar_proposta(nome, desc)
+        inserir("propostas", "cliente, descricao, valor, texto", (nome, desc, valor_orcamento(desc), texto))
+        inserir("tarefas", "titulo, status, prioridade", (f"Follow-up com {nome}", "pendente", "alta"))
+        total += 1
+    return f"Workflows executados. Leads processados: {total}"
+
+
+def gerar_analytics():
+    receita, despesa, lucro = financeiro()
+    pedidos = contar("pedidos")
+    leads = contar("leads")
+    propostas = contar("propostas")
+    taxa = round((pedidos / leads) * 100, 2) if leads else 0
+    texto = f"Receita R$ {receita:.2f}; Despesa R$ {despesa:.2f}; Lucro R$ {lucro:.2f}; Leads {leads}; Pedidos {pedidos}; Propostas {propostas}; Conversão estimada {taxa}%"
+    inserir("analytics", "tipo, valor, observacao", ("resumo", str(lucro), texto))
+    return f"📈 ANALYTICS IA\n\n{texto}\n\nSugestão: gerar campanha, seguir leads mornos/quentes e revisar estoque."
+
 def layout(conteudo):
     menu = [
         ("Dashboard", "/"),
         ("Criar", "/criar"),
         ("Neural Center", "/neural"),
+        ("Singularity", "/singularity"),
+        ("Workflow Vendas", "/workflow-vendas"),
+        ("Funil", "/funil"),
+        ("Decisão Máxima", "/decisao-maxima"),
         ("Multiagentes", "/multiagentes"),
         ("Conteúdo IA", "/conteudo"),
         ("Aprovação Posts", "/aprovacoes"),
         ("Instagram Queue", "/instagram"),
+        ("Operador IA", "/operador"),
+        ("Workflows", "/workflows"),
+        ("Voz IA", "/voz"),
+        ("Imagem IA", "/imagem-ia"),
+        ("Vídeo IA", "/video-ia"),
+        ("Analytics IA", "/analytics"),
+        ("Multiempresa", "/empresas"),
         ("Propostas", "/propostas"),
         ("PDF Proposta", "/pdf-proposta"),
         ("Atendimento", "/atendimento"),
@@ -765,7 +899,7 @@ def layout(conteudo):
         "producao", "tarefas", "campanhas", "conteudos",
         "documentos", "conhecimento", "uploads", "atendimentos",
         "fornecedores", "notificacoes", "metas", "automacoes",
-        "memoria", "agentes", "instagram_queue", "logs"
+        "memoria", "agentes", "instagram_queue", "workflows", "voz", "imagem_jobs", "video_jobs", "empresas", "analytics", "logs"
     ]
 
     links = "".join([f"<a href='{url}'>{nome}</a>" for nome, url in menu])
@@ -774,7 +908,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V35 Neural Empire</title>
+<title>StreetCore V37 Singularity Empire</title>
 <style>
 body{{margin:0;background:#050505;color:#fff;font-family:Arial;}}
 .sidebar{{position:fixed;top:0;left:0;bottom:0;width:315px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto;}}
@@ -803,7 +937,7 @@ body{{background:white;color:black;}}
 </head>
 <body>
 <div class="sidebar">
-<h2>🔥 StreetCore V35</h2>
+<h2>🔥 StreetCore V37</h2>
 {links}
 <a href="/logout">Sair</a>
 </div>
@@ -840,7 +974,7 @@ def login():
     return f"""
 <body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#111;padding:40px;border-radius:20px;width:330px">
-<h1>🔥 StreetCore V35</h1>
+<h1>🔥 StreetCore V37</h1>
 {erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
@@ -894,7 +1028,7 @@ def home():
     """
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V35 NEURAL EMPIRE FREE</h1>
+    <h1>🔥 STREETCORE OS V37 SINGULARITY CORE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
     <div class="grid">{cards}</div>
     {grafico}
@@ -906,7 +1040,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "V35 NEURAL EMPIRE FREE",
+        "version": "V37 SINGULARITY CORE FREE",
         "webhook": bool(WEBHOOK_URL),
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
@@ -1285,6 +1419,122 @@ def cliente_orcamento():
     return f"<pre>{texto}</pre><a href='/cliente'>Voltar</a>"
 
 
+
+@app.route("/operador", methods=["GET", "POST"])
+def operador():
+    if not login_required():
+        return redirect("/login")
+    resposta = ""
+    if request.method == "POST":
+        resposta = operador_ia(request.form.get("comando", ""))
+    return layout(f"""
+    <h1>⚡ Operador IA Autônomo</h1>
+    <div class="card"><form method="POST"><input name="comando" placeholder="Ex: vender mais camisetas hoje"><button>Executar Operador IA</button></form></div>
+    <div class="card"><pre>{resposta}</pre></div>
+    """)
+
+
+@app.route("/workflows", methods=["GET", "POST"])
+def workflows():
+    if not login_required():
+        return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "criar":
+            msg = criar_workflow_padrao()
+        elif acao == "executar":
+            msg = executar_workflows()
+    return layout(f"""
+    <h1>🔁 Workflows Automáticos</h1>
+    <div class="card">
+        <form method="POST"><button name="acao" value="criar">Criar workflow padrão</button> <button name="acao" value="executar">Executar workflows agora</button></form>
+    </div>
+    <div class="card"><pre>{msg}</pre></div>
+    <pre>{listar('workflows')}</pre>
+    """)
+
+
+@app.route("/voz", methods=["GET", "POST"])
+def voz_page():
+    if not login_required():
+        return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        texto = request.form.get("texto", "")
+        resposta = faq(texto)
+        inserir("voz", "arquivo, transcricao, resposta", ("texto_manual", texto, resposta))
+        msg = resposta
+    return layout(f"""
+    <h1>🎙️ Voz IA</h1>
+    <p>Modo gratuito: registra texto/transcrição. Áudio real pode ser conectado depois com Whisper local.</p>
+    <div class="card"><form method="POST"><textarea name="texto" placeholder="Digite ou cole uma transcrição de áudio"></textarea><button>Responder</button></form></div>
+    <div class="card"><pre>{msg}</pre></div>
+    <pre>{listar('voz')}</pre>
+    """)
+
+
+@app.route("/imagem-ia", methods=["GET", "POST"])
+def imagem_ia():
+    if not login_required():
+        return redirect("/login")
+    prompt = ""
+    if request.method == "POST":
+        prompt = gerar_prompt_imagem(request.form.get("tema", "Street Graff"))
+    return layout(f"""
+    <h1>🎨 Imagem IA</h1>
+    <p>Gera prompt pronto para Stable Diffusion, Leonardo, Bing Image Creator ou outra IA grátis.</p>
+    <div class="card"><form method="POST"><input name="tema" placeholder="Tema da arte"><button>Gerar prompt</button></form></div>
+    <div class="card"><pre>{prompt}</pre></div>
+    <pre>{listar('imagem_jobs')}</pre>
+    """)
+
+
+@app.route("/video-ia", methods=["GET", "POST"])
+def video_ia():
+    if not login_required():
+        return redirect("/login")
+    roteiro = ""
+    if request.method == "POST":
+        roteiro = gerar_roteiro_video(request.form.get("tema", "Street Graff"))
+    return layout(f"""
+    <h1>🎬 Vídeo IA</h1>
+    <p>Gera roteiro/prompt para CapCut, TikTok, Canva, Runway ou IA de vídeo gratuita.</p>
+    <div class="card"><form method="POST"><input name="tema" placeholder="Tema do vídeo"><button>Gerar roteiro</button></form></div>
+    <div class="card"><pre>{roteiro}</pre></div>
+    <pre>{listar('video_jobs')}</pre>
+    """)
+
+
+@app.route("/analytics", methods=["GET", "POST"])
+def analytics_page():
+    if not login_required():
+        return redirect("/login")
+    res = ""
+    if request.method == "POST":
+        res = gerar_analytics()
+    return layout(f"""
+    <h1>📈 Analytics IA</h1>
+    <div class="card"><form method="POST"><button>Gerar análise agora</button></form></div>
+    <div class="card"><pre>{res}</pre></div>
+    <pre>{listar('analytics')}</pre>
+    """)
+
+
+@app.route("/empresas", methods=["GET", "POST"])
+def empresas():
+    if not login_required():
+        return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        inserir("empresas", "nome, nicho, status", (request.form.get("nome"), request.form.get("nicho"), "ativa"))
+        msg = "Empresa criada."
+    return layout(f"""
+    <h1>🏢 Multiempresa</h1>
+    <div class="card"><p>{msg}</p><form method="POST"><input name="nome" placeholder="Nome da empresa"><input name="nicho" placeholder="Nicho"><button>Criar empresa</button></form></div>
+    <pre>{listar('empresas')}</pre>
+    """)
+
 @app.route("/financeiro")
 def financeiro_web():
     if not login_required():
@@ -1410,7 +1660,7 @@ def restore():
 @app.route("/api/info")
 def api_info():
     return jsonify({
-        "version": "V35 NEURAL EMPIRE FREE",
+        "version": "V37 SINGULARITY CORE FREE",
         "api_key_header": "X-API-Key",
         "tables": SAFE_TABLES
     })
@@ -1474,7 +1724,7 @@ async def send(update, texto):
 
 async def start_cmd(update, context):
     await send(update,
-        "🔥 STREETCORE V35 NEURAL EMPIRE\n\n"
+        "🔥 STREETCORE V37 SINGULARITY CORE\n\n"
         "/neural vender mais hoje\n"
         "/agentes campanha de camisetas\n"
         "/relatorio\n"
@@ -1496,6 +1746,26 @@ async def neural_cmd(update, context):
 
 async def agentes_cmd(update, context):
     await send(update, conselho_multiagentes(" ".join(context.args)))
+
+
+async def op_cmd(update, context):
+    await send(update, operador_ia(" ".join(context.args)))
+
+
+async def imagem_cmd(update, context):
+    await send(update, gerar_prompt_imagem(" ".join(context.args) or "Street Graff"))
+
+
+async def video_cmd(update, context):
+    await send(update, gerar_roteiro_video(" ".join(context.args) or "Street Graff"))
+
+
+async def workflow_cmd(update, context):
+    await send(update, executar_workflows())
+
+
+async def analytics_cmd(update, context):
+    await send(update, gerar_analytics())
 
 
 async def relatorio_cmd(update, context):
@@ -1556,6 +1826,18 @@ Lucro: R$ {lucro:.2f}
 """)
 
 
+
+
+async def receber_voz(update, context):
+    voice = update.message.voice
+    nome = f"voz_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ogg"
+    path = os.path.join(UPLOAD_FOLDER, nome)
+    arquivo = await context.bot.get_file(voice.file_id)
+    await arquivo.download_to_drive(path)
+    resposta = "Áudio recebido e salvo. Para transcrição real, conecte Whisper local depois."
+    inserir("voz", "arquivo, transcricao, resposta", (nome, "transcricao_pendente", resposta))
+    await send(update, resposta)
+
 async def receber_documento(update, context):
     doc = update.message.document
     nome = limpar_nome(doc.file_name)
@@ -1587,6 +1869,11 @@ async def telegram_main():
 
     comandos = {
         "start": start_cmd,
+        "op": op_cmd,
+        "imagem": imagem_cmd,
+        "video": video_cmd,
+        "workflow": workflow_cmd,
+        "analytics": analytics_cmd,
         "neural": neural_cmd,
         "agentes": agentes_cmd,
         "relatorio": relatorio_cmd,
@@ -1598,12 +1885,16 @@ async def telegram_main():
         "financeiro": financeiro_cmd,
         "post": post_cmd,
         "campanha": campanha_cmd,
-        "buscar": buscar_cmd
+        "buscar": buscar_cmd,
+        "singularity": singularity_cmd,
+        "funil": funil_cmd,
+        "workflow": workflow_cmd
     }
 
     for nome, funcao in comandos.items():
         telegram_app.add_handler(CommandHandler(nome, funcao))
 
+    telegram_app.add_handler(MessageHandler(filters.VOICE, receber_voz))
     telegram_app.add_handler(MessageHandler(filters.Document.ALL, receber_documento))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
@@ -1627,6 +1918,195 @@ def run_telegram():
     asyncio.set_event_loop(loop)
     loop.run_until_complete(telegram_main())
 
+
+
+# =========================
+# V37 SINGULARITY CORE EXTRA
+# =========================
+
+def workflow_vendas(cliente, descricao):
+    valor = valor_orcamento(descricao)
+    texto = gerar_proposta(cliente, descricao)
+
+    inserir("leads", "nome, origem, temperatura", (cliente, "workflow_vendas", "quente"))
+    inserir("propostas", "cliente, descricao, valor, texto", (cliente, descricao, valor, texto))
+    inserir("tarefas", "titulo, status, prioridade", (f"Follow-up com {cliente}", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", (f"Novo workflow de venda criado para {cliente}", "nova"))
+
+    return f"""🔥 WORKFLOW DE VENDAS EXECUTADO
+
+Cliente: {cliente}
+Pedido: {descricao}
+Valor estimado: R$ {valor:.2f}
+
+Ações feitas:
+✅ lead quente criado
+✅ proposta criada
+✅ tarefa de follow-up criada
+✅ notificação criada
+
+PROPOSTA:
+{texto}
+"""
+
+
+def operador_total(comando):
+    comando_lower = comando.lower()
+
+    if "vender" in comando_lower or "campanha" in comando_lower:
+        tema = comando.replace("vender", "").replace("campanha", "").strip() or "Street Graff"
+        texto = campanha(tema)
+        inserir("tarefas", "titulo, status, prioridade", (f"Executar campanha: {tema}", "pendente", "alta"))
+        return f"🚀 Operador criou campanha e tarefa:\n\n{texto}"
+
+    if "relatorio" in comando_lower or "analisar" in comando_lower:
+        return conselho_multiagentes(comando)
+
+    if "backup" in comando_lower:
+        return "Use o botão Backup no painel para baixar o banco com segurança."
+
+    return f"""🤖 OPERADOR SINGULARITY
+
+Comando recebido:
+{comando}
+
+Plano sugerido:
+1. Criar campanha se o objetivo for venda.
+2. Criar proposta se houver cliente.
+3. Criar tarefa de follow-up.
+4. Conferir financeiro.
+5. Atualizar produção.
+6. Rodar automações.
+"""
+
+
+def funil_vendas():
+    try:
+        frio = sql("SELECT COUNT(*) FROM leads WHERE temperatura='frio'", fetch=True)[0][0]
+        morno = sql("SELECT COUNT(*) FROM leads WHERE temperatura='morno'", fetch=True)[0][0]
+        quente = sql("SELECT COUNT(*) FROM leads WHERE temperatura='quente'", fetch=True)[0][0]
+    except Exception:
+        frio = morno = quente = 0
+
+    abertas = contar("propostas")
+    pedidos = contar("pedidos")
+
+    return f"""📈 FUNIL DE VENDAS
+
+Leads frios: {frio}
+Leads mornos: {morno}
+Leads quentes: {quente}
+Propostas: {abertas}
+Pedidos: {pedidos}
+
+Ação recomendada:
+✅ transformar leads quentes em propostas
+✅ fazer follow-up dos mornos
+✅ criar campanha para gerar novos leads
+"""
+
+
+@app.route("/singularity", methods=["GET", "POST"])
+def singularity_center():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        comando = request.form.get("comando", "")
+        resposta = operador_total(comando)
+
+    return layout(f"""
+    <h1>👑 V37 Singularity Center</h1>
+
+    <div class="card">
+        <form method="POST">
+            <input name="comando" placeholder="Ex: vender mais camisetas hoje">
+            <button>Executar Operador</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <pre>{resposta}</pre>
+    </div>
+    """)
+
+
+@app.route("/workflow-vendas", methods=["GET", "POST"])
+def workflow_vendas_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        cliente = request.form.get("cliente", "cliente")
+        descricao = request.form.get("descricao", "pedido")
+        resposta = workflow_vendas(cliente, descricao)
+
+    return layout(f"""
+    <h1>⚡ Workflow de Vendas</h1>
+
+    <div class="card">
+        <form method="POST">
+            <input name="cliente" placeholder="Nome do cliente">
+            <textarea name="descricao" placeholder="Descrição do pedido"></textarea>
+            <button>Executar workflow</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <pre>{resposta}</pre>
+    </div>
+    """)
+
+
+@app.route("/funil")
+def funil_page():
+    if not login_required():
+        return redirect("/login")
+
+    return layout(f"""
+    <h1>📈 Funil de Vendas</h1>
+    <div class="card">
+        <pre>{funil_vendas()}</pre>
+    </div>
+    """)
+
+
+@app.route("/decisao-maxima")
+def decisao_maxima():
+    if not login_required():
+        return redirect("/login")
+
+    analise = conselho_multiagentes("Analise a operação inteira e diga as próximas ações mais importantes.")
+
+    return layout(f"""
+    <h1>🧠 Decisão Máxima</h1>
+    <div class="card">
+        <pre>{analise}</pre>
+    </div>
+    """)
+
+
+# Comandos extras V37 no Telegram
+async def singularity_cmd(update, context):
+    await send(update, operador_total(" ".join(context.args)))
+
+
+async def funil_cmd(update, context):
+    await send(update, funil_vendas())
+
+
+async def workflow_cmd(update, context):
+    if len(context.args) < 2:
+        await send(update, "Use: /workflow cliente descricao_do_pedido")
+        return
+
+    cliente = context.args[0]
+    descricao = " ".join(context.args[1:])
+    await send(update, workflow_vendas(cliente, descricao))
 
 iniciar_banco()
 
