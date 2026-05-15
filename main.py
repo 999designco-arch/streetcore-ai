@@ -1,6 +1,7 @@
-import os, sqlite3, threading, asyncio, re
+import os, re, io, csv, json, shutil, sqlite3, threading, asyncio, urllib.request
 from datetime import datetime
-from flask import Flask, jsonify, request, redirect, session, Response
+from flask import Flask, jsonify, request, redirect, session, Response, send_file
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 try:
@@ -8,13 +9,25 @@ try:
 except Exception:
     PdfReader = None
 
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+except Exception:
+    canvas = None
+    A4 = None
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v33-godcore")
+SECRET_KEY = os.getenv("SECRET_KEY", "streetcore-v34-omnisystem")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "streetcore")
 API_KEY = os.getenv("STREETCORE_API_KEY", "streetcore-api")
 DB_PATH = os.getenv("DB_PATH", "streetcore_master.db")
 UPLOAD_FOLDER = "uploads"
+BACKUP_FOLDER = "backups"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+USE_OLLAMA = os.getenv("USE_OLLAMA", "false").lower() == "true"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 
 if not TELEGRAM_TOKEN:
     raise ValueError("TELEGRAM_TOKEN não encontrado.")
@@ -22,8 +35,13 @@ if not TELEGRAM_TOKEN:
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(BACKUP_FOLDER, exist_ok=True)
+
+telegram_app = None
+telegram_loop = None
 
 TABLES = {
+    "usuarios": "id INTEGER PRIMARY KEY AUTOINCREMENT,usuario TEXT UNIQUE,senha TEXT,nivel TEXT DEFAULT 'admin',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "pedidos": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,cliente TEXT,status TEXT DEFAULT 'novo',valor REAL DEFAULT 0,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "leads": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,origem TEXT,status TEXT DEFAULT 'novo',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "clientes": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,contato TEXT,historico TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
@@ -34,19 +52,25 @@ TABLES = {
     "tarefas": "id INTEGER PRIMARY KEY AUTOINCREMENT,titulo TEXT,status TEXT DEFAULT 'pendente',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "campanhas": "id INTEGER PRIMARY KEY AUTOINCREMENT,tema TEXT,texto TEXT,status TEXT DEFAULT 'planejada',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "conteudos": "id INTEGER PRIMARY KEY AUTOINCREMENT,tema TEXT,tipo TEXT,texto TEXT,status TEXT DEFAULT 'rascunho',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-    "propostas": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,descricao TEXT,valor REAL,texto TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "propostas": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,descricao TEXT,valor REAL,texto TEXT,status TEXT DEFAULT 'aberta',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "documentos": "id INTEGER PRIMARY KEY AUTOINCREMENT,titulo TEXT,tipo TEXT,texto TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "conhecimento": "id INTEGER PRIMARY KEY AUTOINCREMENT,titulo TEXT,texto TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "uploads": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,tipo TEXT,texto TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "atendimentos": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,pergunta TEXT,resposta TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "fornecedores": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,contato TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "notificacoes": "id INTEGER PRIMARY KEY AUTOINCREMENT,mensagem TEXT,status TEXT DEFAULT 'nova',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "metas": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,valor TEXT,status TEXT DEFAULT 'ativa',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "automacoes": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,acao TEXT,status TEXT DEFAULT 'ativa',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-    "uploads": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,tipo TEXT,texto TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "logs": "id INTEGER PRIMARY KEY AUTOINCREMENT,mensagem TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
 }
 
 SAFE_TABLES = list(TABLES.keys())
+
+MIGRATIONS = {
+    "pedidos": {"cliente": "TEXT", "valor": "REAL DEFAULT 0"},
+    "conteudos": {"status": "TEXT DEFAULT 'rascunho'"},
+    "propostas": {"status": "TEXT DEFAULT 'aberta'"},
+}
 
 def db():
     return sqlite3.connect(DB_PATH)
@@ -63,13 +87,26 @@ def sql(q, p=(), fetch=False):
 def iniciar_banco():
     for nome, schema in TABLES.items():
         sql(f"CREATE TABLE IF NOT EXISTS {nome} ({schema})")
-    print("✅ StreetCore OS V33 GODCORE iniciado.")
+
+    for tabela, colunas in MIGRATIONS.items():
+        existentes = [c[1] for c in sql(f"PRAGMA table_info({tabela})", fetch=True)]
+        for coluna, tipo in colunas.items():
+            if coluna not in existentes:
+                try:
+                    sql(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
+                except Exception:
+                    pass
+
+    if not sql("SELECT * FROM usuarios WHERE usuario=?", (ADMIN_USER,), True):
+        sql("INSERT INTO usuarios (usuario,senha,nivel) VALUES (?,?,?)", (ADMIN_USER, ADMIN_PASS, "admin"))
+
+    print("✅ StreetCore OS V34 OMNISYSTEM iniciado.")
 
 def inserir(tabela, campos, valores):
     q = ",".join(["?"] * len(valores))
     sql(f"INSERT INTO {tabela} ({campos}) VALUES ({q})", valores)
 
-def listar(tabela, limit=150):
+def listar(tabela, limit=200):
     if tabela not in SAFE_TABLES:
         return []
     return sql(f"SELECT * FROM {tabela} ORDER BY id DESC LIMIT ?", (limit,), True)
@@ -78,29 +115,30 @@ def contar(tabela):
     return sql(f"SELECT COUNT(*) FROM {tabela}", fetch=True)[0][0]
 
 def log(msg):
-    inserir("logs", "mensagem", (msg,))
+    inserir("logs", "mensagem", (str(msg),))
 
 def financeiro():
-    r = sql("SELECT SUM(valor) FROM financeiro WHERE tipo='receita'", fetch=True)[0][0] or 0
-    d = sql("SELECT SUM(valor) FROM financeiro WHERE tipo='despesa'", fetch=True)[0][0] or 0
-    return r, d, r - d
+    receita = sql("SELECT SUM(valor) FROM financeiro WHERE tipo='receita'", fetch=True)[0][0] or 0
+    despesa = sql("SELECT SUM(valor) FROM financeiro WHERE tipo='despesa'", fetch=True)[0][0] or 0
+    return receita, despesa, receita - despesa
 
 def login_required():
     return session.get("ok") is True
+
+def is_admin():
+    return session.get("nivel") == "admin"
 
 def limpar_nome(nome):
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", nome or "arquivo")
 
 def extrair_txt(path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception:
+    for enc in ["utf-8", "latin-1"]:
         try:
-            with open(path, "r", encoding="latin-1") as f:
+            with open(path, "r", encoding=enc) as f:
                 return f.read()
         except Exception:
-            return ""
+            pass
+    return ""
 
 def extrair_pdf(path):
     if PdfReader is None:
@@ -118,7 +156,30 @@ def extrair_arquivo(path):
         return extrair_pdf(path)
     return ""
 
+def ollama(prompt):
+    if not USE_OLLAMA:
+        return ""
+    try:
+        payload = json.dumps({
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            OLLAMA_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=25) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            return data.get("response", "")
+    except Exception as e:
+        return f"Ollama indisponível: {e}"
+
 def post(tema):
+    ia = ollama(f"Crie um post de Instagram para Street Graff sobre {tema}.")
+    if ia:
+        return ia
     return f"""🔥 POST PRONTO - {tema.upper()}
 
 Sua marca precisa aparecer com presença.
@@ -162,7 +223,7 @@ def valor_orcamento(desc):
 
 def gerar_proposta(cliente, desc):
     v = valor_orcamento(desc)
-    return f"""🧾 PROPOSTA COMERCIAL STREET GRAFF
+    return f"""PROPOSTA COMERCIAL STREET GRAFF
 
 Cliente: {cliente}
 Solicitação: {desc}
@@ -180,7 +241,7 @@ Pagamento: somente via PIX.
 Para confirmar, envie arte/referência e quantidade final."""
 
 def contrato(cliente, servico, valor):
-    return f"""📄 CONTRATO SIMPLES
+    return f"""CONTRATO SIMPLES
 
 Contratante: {cliente}
 Contratada: Street Graff
@@ -204,7 +265,7 @@ def faq(pergunta):
     return "Fazemos camisetas, adesivos, canecas, panfletos e brindes personalizados."
 
 def plano():
-    return """✅ PLANO GODCORE DO DIA
+    return """✅ PLANO OMNISYSTEM DO DIA
 
 1. Ver leads novos.
 2. Responder clientes.
@@ -216,13 +277,31 @@ def plano():
 8. Conferir estoque.
 9. Registrar receitas e despesas.
 10. Gerar propostas para leads quentes.
-11. Consultar base de conhecimento.
-12. Fazer backup e fechar vendas."""
+11. Consultar uploads/conhecimento.
+12. Rodar automações.
+13. Fazer backup e fechar vendas."""
 
 def relatorio():
     r, d, l = financeiro()
-    linhas = [f"{t}: {contar(t)}" for t in ["pedidos","leads","clientes","propostas","produtos","estoque","producao","tarefas","campanhas","conteudos","documentos","conhecimento","uploads","atendimentos","automacoes"]]
-    return "📊 RELATÓRIO GODCORE V33\n\n" + "\n".join(linhas) + f"\n\nReceita: R$ {r:.2f}\nDespesa: R$ {d:.2f}\nLucro: R$ {l:.2f}\n\nDecisão: captar leads, gerar campanha, aprovar posts, criar propostas e acompanhar produção."
+    linhas = [f"{t}: {contar(t)}" for t in [
+        "pedidos","leads","clientes","propostas","produtos","estoque",
+        "producao","tarefas","campanhas","conteudos","documentos",
+        "conhecimento","uploads","atendimentos","automacoes"
+    ]]
+    return "📊 RELATÓRIO OMNISYSTEM V34\n\n" + "\n".join(linhas) + f"""
+
+Receita: R$ {r:.2f}
+Despesa: R$ {d:.2f}
+Lucro: R$ {l:.2f}
+
+Decisão:
+✅ captar leads;
+✅ gerar campanha;
+✅ aprovar posts;
+✅ criar propostas;
+✅ acompanhar produção;
+✅ rodar automações;
+✅ proteger dados com backup."""
 
 def buscar(termo):
     like = f"%{termo}%"
@@ -243,44 +322,87 @@ def buscar(termo):
             blocos.append(f"{t.upper()}:\n" + "\n".join(map(str, dados)))
     return "\n\n".join(blocos) if blocos else "Nenhum resultado encontrado."
 
+def gerar_pdf_proposta(cliente, desc):
+    texto = gerar_proposta(cliente, desc)
+    buffer = io.BytesIO()
+
+    if canvas is None:
+        buffer.write(texto.encode("utf-8"))
+        buffer.seek(0)
+        return buffer, "txt"
+
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 50
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, y, "Proposta Comercial - Street Graff")
+    y -= 35
+    c.setFont("Helvetica", 11)
+
+    for linha in texto.split("\n"):
+        if y < 60:
+            c.showPage()
+            c.setFont("Helvetica", 11)
+            y = height - 50
+        c.drawString(50, y, linha[:95])
+        y -= 17
+
+    c.save()
+    buffer.seek(0)
+    return buffer, "pdf"
+
+def rodar_automacoes():
+    hoje = datetime.now().strftime("%d/%m/%Y %H:%M")
+    inserir("tarefas", "titulo,status", (f"Revisar leads - {hoje}", "pendente"))
+    inserir("notificacoes", "mensagem,status", (f"Rodar campanha diária - {hoje}", "nova"))
+    inserir("conteudos", "tema,tipo,texto,status", ("Street Graff", "post_auto", post("Street Graff"), "rascunho"))
+    return "Automações executadas: tarefa, notificação e post em rascunho criados."
+
 def layout(c):
     menu = [
-        ("Dashboard", "/"), ("Criar", "/criar"), ("GodCore", "/godcore"),
+        ("Dashboard", "/"), ("Criar", "/criar"), ("OmniCore", "/omnicore"),
         ("Conteúdo IA", "/conteudo"), ("Aprovação Posts", "/aprovacoes"),
-        ("Propostas", "/propostas"), ("Orçamento Print", "/orcamento-print"),
+        ("Propostas", "/propostas"), ("PDF Proposta", "/pdf-proposta"),
         ("Atendimento", "/atendimento"), ("Upload", "/upload"),
         ("Busca", "/buscar"), ("Financeiro", "/financeiro"),
-        ("Relatório", "/relatorio"), ("Modo Cliente", "/cliente"),
-        ("API Info", "/api/info"), ("Backup", "/backup")
+        ("Relatório", "/relatorio"), ("Automações", "/automacoes"),
+        ("Usuários", "/usuarios"), ("Modo Cliente", "/cliente"),
+        ("API Info", "/api/info"), ("Backup", "/backup"), ("Restaurar", "/restore")
     ]
     tables = ["pedidos","leads","clientes","produtos","estoque","producao","tarefas","campanhas","conteudos","documentos","conhecimento","uploads","atendimentos","fornecedores","notificacoes","metas","automacoes","logs"]
     links = "".join([f"<a href='{u}'>{n}</a>" for n,u in menu])
     links += "<hr>" + "".join([f"<a href='/table/{t}'>{t.title()}</a>" for t in tables])
     return f"""
-<html><head><title>StreetCore V33 GODCORE</title>
+<html><head><title>StreetCore V34 OMNISYSTEM</title>
 <style>
 body{{margin:0;background:#050505;color:#fff;font-family:Arial}}
-.sidebar{{position:fixed;top:0;left:0;bottom:0;width:295px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto}}
+.sidebar{{position:fixed;top:0;left:0;bottom:0;width:305px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto}}
 .sidebar h2{{color:#00ff88}} .sidebar a{{display:block;color:white;text-decoration:none;margin:11px 0}} .sidebar a:hover{{color:#00ff88}}
-.main{{margin-left:345px;padding:30px}} .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px}}
+.main{{margin-left:355px;padding:30px}} .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px}}
 .card{{background:#111;border:1px solid #333;border-radius:18px;padding:22px;margin-bottom:18px}} .big{{color:#00ff88;font-size:34px;font-weight:bold}}
 input,select,textarea{{padding:12px;border-radius:10px;border:0;margin:6px 0;width:100%;background:#1c1c1c;color:white}} textarea{{min-height:170px}}
 button{{padding:12px 18px;border:0;border-radius:10px;background:#00ff88;font-weight:bold;cursor:pointer}}
 table{{width:100%;border-collapse:collapse;background:#111}} th,td{{padding:12px;border-bottom:1px solid #333;vertical-align:top}} a{{color:#00ff88}} pre{{white-space:pre-wrap}}
+.bar{{background:#00ff88;height:18px;border-radius:10px}}
 @media print{{.sidebar{{display:none}}.main{{margin-left:0}}body{{background:white;color:black}}.card{{border:1px solid #999;background:white;color:black}}}}
 </style></head>
-<body><div class="sidebar"><h2>🔥 StreetCore V33</h2>{links}<a href='/logout'>Sair</a></div><div class="main">{c}</div></body></html>"""
+<body><div class="sidebar"><h2>🔥 StreetCore V34</h2>{links}<a href='/logout'>Sair</a></div><div class="main">{c}</div></body></html>"""
 
 @app.route("/login", methods=["GET","POST"])
 def login():
     erro = ""
     if request.method == "POST":
-        if request.form.get("usuario") == ADMIN_USER and request.form.get("senha") == ADMIN_PASS:
+        u = request.form.get("usuario")
+        s = request.form.get("senha")
+        user = sql("SELECT usuario,nivel FROM usuarios WHERE usuario=? AND senha=?", (u, s), True)
+        if user:
             session["ok"] = True
+            session["usuario"] = user[0][0]
+            session["nivel"] = user[0][1]
             return redirect("/")
         erro = "<p style='color:red'>Login incorreto</p>"
     return f"""<body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
-<div style="background:#111;padding:40px;border-radius:20px;width:330px"><h1>🔥 StreetCore V33</h1>{erro}
+<div style="background:#111;padding:40px;border-radius:20px;width:330px"><h1>🔥 StreetCore V34</h1>{erro}
 <form method="POST"><input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
 <input name="senha" type="password" placeholder="Senha" style="width:100%;padding:14px;margin-bottom:12px">
 <button style="width:100%;padding:14px;background:#00ff88;border:0;border-radius:10px;font-weight:bold">Entrar</button></form>
@@ -297,20 +419,28 @@ def home():
     r,d,l = financeiro()
     cards = "".join([f"<div class='card'><h2>{t.title()}</h2><div class='big'>{contar(t)}</div></div>" for t in ["pedidos","leads","clientes","propostas","conteudos","uploads","produtos","estoque","producao","tarefas","atendimentos"]])
     cards += f"<div class='card'><h2>Receita</h2><div class='big'>R$ {r:.2f}</div></div><div class='card'><h2>Lucro</h2><div class='big'>R$ {l:.2f}</div></div>"
-    return layout(f"<h1>🔥 STREETCORE OS V33 GODCORE FREE</h1><div class='grid'>{cards}</div><div class='card'><pre>{plano()}</pre></div>")
+    grafico = f"""
+    <div class='card'><h2>Gráfico rápido</h2>
+    <p>Receita</p><div class='bar' style='width:{min(r/10,100)}%'></div>
+    <p>Despesa</p><div class='bar' style='width:{min(d/10,100)}%'></div>
+    <p>Lucro</p><div class='bar' style='width:{min(max(l,0)/10,100)}%'></div>
+    </div>
+    """
+    return layout(f"<h1>🔥 STREETCORE OS V34 OMNISYSTEM FREE</h1><div class='grid'>{cards}</div>{grafico}<div class='card'><pre>{plano()}</pre></div>")
 
 @app.route("/health")
 def health():
-    return jsonify({"status":"online","version":"V33 GODCORE FREE"})
+    return jsonify({"status":"online","version":"V34 OMNISYSTEM FREE","webhook":bool(WEBHOOK_URL),"ollama":USE_OLLAMA})
 
-@app.route("/godcore", methods=["GET","POST"])
-def godcore():
+@app.route("/omnicore", methods=["GET","POST"])
+def omnicore():
     if not login_required(): return redirect("/login")
     resp = ""
     if request.method == "POST":
         comando = request.form.get("comando","")
-        resp = f"🧠 GODCORE ANALYSIS\n\nComando: {comando}\n\n{relatorio()}\n\n{plano()}"
-    return layout(f"<h1>🧠 GodCore Center</h1><div class='card'><form method='POST'><input name='comando' placeholder='O que devo analisar?'><button>Analisar</button></form></div><div class='card'><pre>{resp}</pre></div>")
+        ia = ollama(f"Analise esta operação da Street Graff: {comando}\n\n{relatorio()}") if USE_OLLAMA else ""
+        resp = ia or f"🧠 OMNICORE ANALYSIS\n\nComando: {comando}\n\n{relatorio()}\n\n{plano()}"
+    return layout(f"<h1>🧠 OmniCore</h1><div class='card'><form method='POST'><input name='comando' placeholder='O que devo analisar?'><button>Analisar</button></form></div><div class='card'><pre>{resp}</pre></div>")
 
 @app.route("/criar", methods=["GET","POST"])
 def criar():
@@ -369,13 +499,17 @@ def propostas():
         inserir("propostas","cliente,descricao,valor,texto",(cliente,desc,valor_orcamento(desc),res))
     return layout(f"<h1>🧾 Propostas</h1><div class='card'><form method='POST'><input name='cliente' placeholder='Cliente'><textarea name='descricao'></textarea><button>Gerar</button></form></div><div class='card'><pre>{res}</pre></div>")
 
-@app.route("/orcamento-print", methods=["GET","POST"])
-def orcamento_print():
+@app.route("/pdf-proposta", methods=["GET","POST"])
+def pdf_proposta():
     if not login_required(): return redirect("/login")
-    res = ""
     if request.method == "POST":
-        res = gerar_proposta(request.form.get("cliente"), request.form.get("descricao"))
-    return layout(f"<h1>🖨️ Orçamento Imprimível</h1><div class='card'><form method='POST'><input name='cliente' placeholder='Cliente'><textarea name='descricao' placeholder='Descrição'></textarea><button>Gerar</button></form></div><div class='card'><pre>{res}</pre><button onclick='window.print()'>Imprimir / Salvar PDF</button></div>")
+        cliente = request.form.get("cliente")
+        desc = request.form.get("descricao")
+        buffer, tipo = gerar_pdf_proposta(cliente, desc)
+        if tipo == "pdf":
+            return send_file(buffer, as_attachment=True, download_name="proposta_streetgraff.pdf", mimetype="application/pdf")
+        return send_file(buffer, as_attachment=True, download_name="proposta_streetgraff.txt", mimetype="text/plain")
+    return layout("<h1>📄 Gerar PDF de Proposta</h1><div class='card'><form method='POST'><input name='cliente' placeholder='Cliente'><textarea name='descricao' placeholder='Descrição'></textarea><button>Gerar PDF</button></form></div>")
 
 @app.route("/atendimento", methods=["GET","POST"])
 def atendimento():
@@ -409,11 +543,32 @@ def buscar_web():
     res = ""
     if request.method == "POST":
         res = buscar(request.form.get("termo",""))
-    return layout(f"<h1>🔎 Busca Geral + Conhecimento</h1><div class='card'><form method='POST'><input name='termo'><button>Buscar</button></form></div><div class='card'><pre>{res}</pre></div>")
+    return layout(f"<h1>🔎 Busca Inteligente</h1><div class='card'><form method='POST'><input name='termo'><button>Buscar</button></form></div><div class='card'><pre>{res}</pre></div>")
+
+@app.route("/automacoes", methods=["GET","POST"])
+def automacoes():
+    if not login_required(): return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        msg = rodar_automacoes()
+    return layout(f"<h1>⚙️ Automações</h1><div class='card'><form method='POST'><button>Rodar automações agora</button></form></div><div class='card'><pre>{msg}</pre></div><pre>{listar('automacoes')}</pre>")
+
+@app.route("/usuarios", methods=["GET","POST"])
+def usuarios():
+    if not login_required(): return redirect("/login")
+    if not is_admin(): return "Apenas admin."
+    msg = ""
+    if request.method == "POST":
+        try:
+            inserir("usuarios","usuario,senha,nivel",(request.form.get("usuario"), request.form.get("senha"), request.form.get("nivel")))
+            msg = "Usuário criado."
+        except Exception as e:
+            msg = f"Erro: {e}"
+    return layout(f"<h1>👤 Usuários</h1><div class='card'><p>{msg}</p><form method='POST'><input name='usuario' placeholder='Usuário'><input name='senha' placeholder='Senha'><select name='nivel'><option>admin</option><option>operador</option></select><button>Criar</button></form></div><pre>{listar('usuarios')}</pre>")
 
 @app.route("/cliente")
 def cliente_publico():
-    return f"""
+    return """
 <html><body style="background:#050505;color:white;font-family:Arial;padding:30px">
 <h1>🔥 Street Graff</h1>
 <p>Camisetas, adesivos, canecas, panfletos e brindes personalizados.</p>
@@ -445,7 +600,7 @@ def financeiro_web():
 @app.route("/relatorio")
 def relatorio_web():
     if not login_required(): return redirect("/login")
-    return layout(f"<h1>📊 Relatório GodCore</h1><div class='card'><pre>{relatorio()}</pre></div>")
+    return layout(f"<h1>📊 Relatório Omnisystem</h1><div class='card'><pre>{relatorio()}</pre></div>")
 
 @app.route("/table/<tabela>")
 def table(tabela):
@@ -458,6 +613,7 @@ def table(tabela):
 @app.route("/delete/<tabela>/<int:item_id>")
 def delete(tabela, item_id):
     if not login_required(): return redirect("/login")
+    if not is_admin(): return "Apenas admin."
     if tabela in SAFE_TABLES:
         sql(f"DELETE FROM {tabela} WHERE id=?", (item_id,))
     return redirect(f"/table/{tabela}")
@@ -467,18 +623,40 @@ def export(tabela):
     if not login_required(): return redirect("/login")
     if tabela not in SAFE_TABLES: return "Tabela não permitida"
     rows = listar(tabela, 10000)
-    csv = "\n".join([",".join([str(x).replace(",", " ") for x in r]) for r in rows])
-    return Response(csv, mimetype="text/csv", headers={"Content-Disposition":f"attachment;filename={tabela}.csv"})
+    output = io.StringIO()
+    writer = csv.writer(output)
+    for row in rows:
+        writer.writerow(row)
+    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition":f"attachment;filename={tabela}.csv"})
 
 @app.route("/backup")
 def backup():
     if not login_required(): return redirect("/login")
-    with open(DB_PATH, "rb") as f: data = f.read()
-    return Response(data, mimetype="application/octet-stream", headers={"Content-Disposition":f"attachment;filename=backup_v33_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"})
+    nome = f"backup_v34_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    destino = os.path.join(BACKUP_FOLDER, nome)
+    shutil.copy(DB_PATH, destino)
+    with open(destino, "rb") as f:
+        data = f.read()
+    return Response(data, mimetype="application/octet-stream", headers={"Content-Disposition":f"attachment;filename={nome}"})
+
+@app.route("/restore", methods=["GET","POST"])
+def restore():
+    if not login_required(): return redirect("/login")
+    if not is_admin(): return "Apenas admin."
+    msg = ""
+    if request.method == "POST":
+        file = request.files.get("backup")
+        if file and file.filename.endswith(".db"):
+            safety = os.path.join(BACKUP_FOLDER, f"before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+            shutil.copy(DB_PATH, safety)
+            file.save(DB_PATH)
+            iniciar_banco()
+            msg = "Backup restaurado. Um backup de segurança foi criado antes."
+    return layout(f"<h1>♻️ Restaurar Backup</h1><div class='card'><p>{msg}</p><form method='POST' enctype='multipart/form-data'><input type='file' name='backup'><button>Restaurar</button></form></div>")
 
 @app.route("/api/info")
 def api_info():
-    return jsonify({"version":"V33 GODCORE FREE","api_key_header":"X-API-Key","tables":SAFE_TABLES})
+    return jsonify({"version":"V34 OMNISYSTEM FREE","api_key_header":"X-API-Key","tables":SAFE_TABLES})
 
 def api_auth():
     return request.headers.get("X-API-Key") == API_KEY
@@ -494,13 +672,36 @@ def api_table(tabela):
     if tabela not in SAFE_TABLES: return jsonify({"erro":"tabela inválida"}), 400
     return jsonify({"dados":listar(tabela)})
 
+@app.route("/api/create/<tabela>", methods=["POST"])
+def api_create(tabela):
+    if not api_auth(): return jsonify({"erro":"API key inválida"}), 403
+    data = request.json or {}
+    try:
+        if tabela == "pedidos":
+            inserir("pedidos","nome,cliente,valor",(data.get("nome"), data.get("cliente"), float(data.get("valor",0))))
+        elif tabela == "leads":
+            inserir("leads","nome,origem",(data.get("nome"), data.get("origem","api")))
+        else:
+            return jsonify({"erro":"criação permitida apenas para pedidos/leads"}), 400
+        return jsonify({"status":"criado"})
+    except Exception as e:
+        return jsonify({"erro":str(e)}), 500
+
+@app.route("/telegram-webhook", methods=["POST"])
+def telegram_webhook():
+    if not telegram_app or not telegram_loop:
+        return "bot indisponível", 503
+    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    asyncio.run_coroutine_threadsafe(telegram_app.process_update(update), telegram_loop)
+    return "ok"
+
 async def send(update, txt):
-    await update.message.reply_text(txt[:3900])
+    await update.message.reply_text(str(txt)[:3900])
 
 async def start_cmd(update, context):
-    await send(update, "🔥 STREETCORE V33 GODCORE\n/godcore vender mais\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/financeiro\n/post camisetas\n/campanha street graff\n/buscar joao")
+    await send(update, "🔥 STREETCORE V34 OMNISYSTEM\n/omni vender mais\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/financeiro\n/post camisetas\n/campanha street graff\n/buscar joao")
 
-async def godcore_cmd(update, context): await send(update, f"🧠 GODCORE\n\n{relatorio()}\n\n{plano()}")
+async def omni_cmd(update, context): await send(update, f"🧠 OMNISYSTEM\n\n{relatorio()}\n\n{plano()}")
 async def relatorio_cmd(update, context): await send(update, relatorio())
 async def post_cmd(update, context): await send(update, post(" ".join(context.args) or "Street Graff"))
 async def campanha_cmd(update, context): await send(update, campanha(" ".join(context.args) or "Street Graff"))
@@ -551,22 +752,34 @@ async def responder(update, context):
     await send(update, faq(update.message.text))
 
 async def telegram_main():
-    bot = Application.builder().token(TELEGRAM_TOKEN).build()
+    global telegram_app, telegram_loop
+    telegram_loop = asyncio.get_event_loop()
+    telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
+
     commands = {
-        "start": start_cmd, "godcore": godcore_cmd, "relatorio": relatorio_cmd,
+        "start": start_cmd, "omni": omni_cmd, "relatorio": relatorio_cmd,
         "pedido": pedido_cmd, "lead": lead_cmd, "proposta": proposta_cmd,
         "receita": receita_cmd, "despesa": despesa_cmd, "financeiro": financeiro_cmd,
         "post": post_cmd, "campanha": campanha_cmd, "buscar": buscar_cmd
     }
+
     for n,f in commands.items():
-        bot.add_handler(CommandHandler(n, f))
-    bot.add_handler(MessageHandler(filters.Document.ALL, receber_documento))
-    bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
-    print("🔥 Telegram iniciando V33...")
-    await bot.initialize()
-    await bot.start()
-    await bot.updater.start_polling()
-    print("✅ Telegram ONLINE V33")
+        telegram_app.add_handler(CommandHandler(n, f))
+
+    telegram_app.add_handler(MessageHandler(filters.Document.ALL, receber_documento))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
+
+    print("🔥 Telegram iniciando V34...")
+    await telegram_app.initialize()
+    await telegram_app.start()
+
+    if WEBHOOK_URL:
+        await telegram_app.bot.set_webhook(f"{WEBHOOK_URL.rstrip('/')}/telegram-webhook")
+        print("✅ Telegram WEBHOOK ativo V34")
+    else:
+        await telegram_app.updater.start_polling()
+        print("✅ Telegram POLLING ativo V34")
+
     await asyncio.Event().wait()
 
 def run_telegram():
