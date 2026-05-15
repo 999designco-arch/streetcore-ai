@@ -263,6 +263,11 @@ TABLES = {
         observacao TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
+    "pipeline": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,etapa TEXT,valor REAL DEFAULT 0,observacao TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "oportunidades": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,produto TEXT,valor REAL DEFAULT 0,probabilidade INTEGER DEFAULT 50,status TEXT DEFAULT 'aberta',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "auditoria": "id INTEGER PRIMARY KEY AUTOINCREMENT,acao TEXT,detalhes TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "ideias": "id INTEGER PRIMARY KEY AUTOINCREMENT,tema TEXT,ideia TEXT,status TEXT DEFAULT 'nova',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "rotinas": "id INTEGER PRIMARY KEY AUTOINCREMENT,nome TEXT,descricao TEXT,status TEXT DEFAULT 'ativa',criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -332,7 +337,7 @@ def iniciar_banco():
                 (nome, funcao, "Aguardando primeira execução.")
             )
 
-    print("✅ StreetCore OS V38 MASTER ADVANCED CORE iniciado.")
+    print("✅ StreetCore OS V39 ULTRA INFINITY CORE iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -388,6 +393,20 @@ def numero_int(valor, padrao=0):
 
 def limpar_nome(nome):
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", nome or "arquivo")
+def texto_limpo(valor, padrao=""):
+    try:
+        valor = "" if valor is None else str(valor).strip()
+        return valor if valor else padrao
+    except Exception:
+        return padrao
+
+
+def dinheiro_br(valor):
+    try:
+        return f"R$ {float(valor):.2f}"
+    except Exception:
+        return "R$ 0.00"
+
 
 
 def extrair_txt(path):
@@ -881,7 +900,13 @@ def layout(conteudo):
         ("Dashboard", "/"),
         ("Criar", "/criar"),
         ("Neural Center", "/neural"),
-        ("Master V38", "/master"),
+        ("Master V39", "/master"),
+        ("Ultra Infinity", "/ultra"),
+        ("Pipeline", "/pipeline"),
+        ("Oportunidades", "/oportunidades"),
+        ("Auditoria", "/auditoria"),
+        ("Ideias IA", "/ideias-ia"),
+        ("Rotinas", "/rotinas"),
         ("Alertas", "/alertas"),
         ("Follow-up", "/followup"),
         ("Singularity", "/singularity"),
@@ -928,7 +953,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V38 Singularity Empire</title>
+<title>StreetCore V39 Singularity Empire</title>
 <style>
 body{{margin:0;background:#050505;color:#fff;font-family:Arial;}}
 .sidebar{{position:fixed;top:0;left:0;bottom:0;width:315px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto;}}
@@ -957,7 +982,7 @@ body{{background:white;color:black;}}
 </head>
 <body>
 <div class="sidebar">
-<h2>🔥 StreetCore V38</h2>
+<h2>🔥 StreetCore V39</h2>
 {links}
 <a href="/logout">Sair</a>
 </div>
@@ -994,7 +1019,7 @@ def login():
     return f"""
 <body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#111;padding:40px;border-radius:20px;width:330px">
-<h1>🔥 StreetCore V38</h1>
+<h1>🔥 StreetCore V39</h1>
 {erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
@@ -1048,7 +1073,7 @@ def home():
     """
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V38 MASTER ADVANCED CORE FREE</h1>
+    <h1>🔥 STREETCORE OS V39 ULTRA INFINITY CORE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
     <div class="grid">{cards}</div>
     {grafico}
@@ -1060,7 +1085,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "V38 MASTER ADVANCED CORE FREE",
+        "version": "V39 ULTRA INFINITY CORE FREE",
         "webhook": bool(WEBHOOK_URL),
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
@@ -1680,7 +1705,7 @@ def restore():
 @app.route("/api/info")
 def api_info():
     return jsonify({
-        "version": "V38 MASTER ADVANCED CORE FREE",
+        "version": "V39 ULTRA INFINITY CORE FREE",
         "api_key_header": "X-API-Key",
         "tables": SAFE_TABLES
     })
@@ -1744,7 +1769,7 @@ async def send(update, texto):
 
 async def start_cmd(update, context):
     await send(update,
-        "🔥 STREETCORE V38 MASTER ADVANCED CORE\n\n"
+        "🔥 STREETCORE V39 ULTRA INFINITY CORE\n\n"
         "/neural vender mais hoje\n"
         "/agentes campanha de camisetas\n"
         "/relatorio\n"
@@ -1914,6 +1939,15 @@ async def telegram_main():
     for nome, funcao in comandos.items():
         telegram_app.add_handler(CommandHandler(nome, funcao))
     for nome, funcao in {
+        "ultra": ultra_cmd,
+        "pipeline": pipeline_cmd,
+        "oportunidade": oportunidades_cmd,
+        "organizar": organizar_cmd,
+        "ideias_ultra": ideias_ultra_cmd,
+        "proposta_avancada": proposta_avancada_cmd
+    }.items():
+        telegram_app.add_handler(CommandHandler(nome, funcao))
+    for nome, funcao in {
         "master": master_cmd,
         "diagnostico": diagnostico_cmd,
         "followup": followup_cmd
@@ -1947,7 +1981,7 @@ def run_telegram():
 
 
 # =========================
-# V38 MASTER ADVANCED CORE EXTRA
+# V39 ULTRA INFINITY CORE EXTRA
 # =========================
 
 def workflow_vendas(cliente, descricao):
@@ -2044,7 +2078,7 @@ def singularity_center():
         resposta = operador_total(comando)
 
     return layout(f"""
-    <h1>👑 V38 Master Advanced Center</h1>
+    <h1>👑 V39 Ultra Infinity Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2116,7 +2150,7 @@ def decisao_maxima():
     """)
 
 
-# Comandos extras V38 no Telegram
+# Comandos extras V39 no Telegram
 async def singularity_cmd(update, context):
     await send(update, operador_total(" ".join(context.args)))
 
@@ -2136,7 +2170,7 @@ async def workflow_cmd(update, context):
 
 
 # =========================
-# V38 MASTER ADVANCED EXTRA
+# V39 ULTRA INFINITY EXTRA
 # =========================
 
 def diagnostico_sistema():
@@ -2155,7 +2189,7 @@ def diagnostico_sistema():
     propostas_abertas = contar("propostas")
     tarefas_pendentes = sql("SELECT COUNT(*) FROM tarefas WHERE status='pendente'", fetch=True)[0][0]
 
-    return f"""🧠 DIAGNÓSTICO MASTER V38
+    return f"""🧠 DIAGNÓSTICO MASTER V39
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -2179,8 +2213,8 @@ Próximas ações:
 def plano_master_automatico():
     diag = diagnostico_sistema()
     acao = campanha("Street Graff personalizados")
-    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V38", "pendente", "alta"))
-    inserir("notificacoes", "mensagem, status", ("Plano Master V38 criado automaticamente.", "nova"))
+    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V39", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", ("Plano Master V39 criado automaticamente.", "nova"))
     return f"""🚀 PLANO MASTER AUTOMÁTICO CRIADO
 
 {diag}
@@ -2227,7 +2261,7 @@ def master_center():
             resposta = conselho_multiagentes("Analise a operação inteira e gere o plano mais avançado possível.")
 
     return layout(f"""
-    <h1>👑 V38 Master Advanced Center</h1>
+    <h1>👑 V39 Ultra Infinity Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2387,12 +2421,12 @@ def criar():
             msg = f"Erro ao criar: {e}"
 
         try:
-            log(f"Criar painel V38: {tipo} | {nome} | {msg}")
+            log(f"Criar painel V39: {tipo} | {nome} | {msg}")
         except Exception:
             pass
 
     return layout(f"""
-    <h1>➕ Criar Registro — V38 corrigido</h1>
+    <h1>➕ Criar Registro — V39 corrigido e ampliado</h1>
 
     <div class="card">
         <p>{msg}</p>
