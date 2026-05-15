@@ -372,6 +372,69 @@ TABLES = {
         status TEXT DEFAULT 'nova',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
+    "autopilot_runs": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        modo TEXT,
+        resultado TEXT,
+        status TEXT DEFAULT 'executado',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "agent_tasks": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agente TEXT,
+        tarefa TEXT,
+        resultado TEXT,
+        status TEXT DEFAULT 'pendente',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "saas_planos": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        preco REAL DEFAULT 0,
+        limites TEXT,
+        status TEXT DEFAULT 'ativo',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "social_calendar": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rede TEXT,
+        tipo TEXT,
+        conteudo TEXT,
+        data TEXT,
+        status TEXT DEFAULT 'agendado',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "prompt_library": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        categoria TEXT,
+        prompt TEXT,
+        status TEXT DEFAULT 'ativo',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "growth_experiments": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        hipotese TEXT,
+        acao TEXT,
+        resultado TEXT,
+        status TEXT DEFAULT 'rodando',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "system_health": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        area TEXT,
+        status TEXT,
+        detalhes TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
+    "mobile_notifications": """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT,
+        mensagem TEXT,
+        status TEXT DEFAULT 'nova',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """,
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -443,7 +506,7 @@ def iniciar_banco():
         if not sql("SELECT * FROM agentes WHERE nome=?", (nome,), True):
             sql("INSERT INTO agentes (nome, funcao, ultima_resposta) VALUES (?, ?, ?)", (nome, funcao, "Aguardando primeira execução."))
 
-    print("✅ StreetCore OS V45 OMNI ENTERPRISE AI iniciado.")
+    print("✅ StreetCore OS V46 SINGULARITY OS iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -735,7 +798,7 @@ def relatorio():
     linhas = []
     for tabela in ["pedidos", "leads", "clientes", "propostas", "produtos", "estoque", "producao", "tarefas", "campanhas", "conteudos", "uploads", "atendimentos", "pipeline", "oportunidades"]:
         linhas.append(f"{tabela}: {contar(tabela)}")
-    return "📊 RELATÓRIO V45 OMNI ENTERPRISE AI\n\n" + "\n".join(linhas) + f"""
+    return "📊 RELATÓRIO V46 SINGULARITY OS\n\n" + "\n".join(linhas) + f"""
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -756,7 +819,7 @@ def diagnostico_sistema():
     except Exception:
         estoque_baixo = []
     alertas = [f"{x[0]} ({x[1]}/{x[2]})" for x in estoque_baixo]
-    return f"""🧠 DIAGNÓSTICO V45
+    return f"""🧠 DIAGNÓSTICO V46
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -910,7 +973,7 @@ def scheduler_loop():
 
 def layout(conteudo):
     menu = [
-        ("Chat IA", "/chat"), ("Workspace", "/workspace"), ("Omni AI", "/omni"), ("CEO", "/ceo"), ("Analytics", "/analytics"), ("Workflows", "/workflows"), ("Memória AI", "/memoria-ai"), ("Mídia IA", "/midia-ai"), ("WhatsApp", "/whatsapp"), ("Empresas", "/empresas"), ("Luxury", "/luxury"), ("Templates", "/templates"), ("Contratos", "/contratos"), ("Agenda", "/agenda"), ("Status Pedido", "/status-pedido"), ("Dashboard", "/"), ("Criar", "/criar"),
+        ("Chat IA", "/chat"), ("Workspace", "/workspace"), ("Singularity", "/singularity"), ("Autopilot", "/autopilot"), ("Agent Lab", "/agent-lab"), ("Social Calendar", "/social-calendar"), ("SaaS", "/saas"), ("Prompt Library", "/prompt-library"), ("Experimentos", "/experimentos"), ("Health Center", "/health-center"), ("Omni AI", "/omni"), ("CEO", "/ceo"), ("Analytics", "/analytics"), ("Workflows", "/workflows"), ("Memória AI", "/memoria-ai"), ("Mídia IA", "/midia-ai"), ("WhatsApp", "/whatsapp"), ("Empresas", "/empresas"), ("Luxury", "/luxury"), ("Templates", "/templates"), ("Contratos", "/contratos"), ("Agenda", "/agenda"), ("Status Pedido", "/status-pedido"), ("Dashboard", "/"), ("Criar", "/criar"),
         ("Executivo", "/executivo"), ("Quantum", "/quantum"), ("Master", "/master"), ("Ultra", "/ultra"),
         ("Neural", "/neural"), ("Multiagentes", "/multiagentes"), ("Pipeline", "/pipeline"),
         ("Kanban Leads", "/kanban-leads"), ("Kanban Produção", "/kanban-producao"), ("Conteúdo", "/conteudo"),
@@ -926,7 +989,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V45 Omni Enterprise AI</title>
+<title>StreetCore V46 Singularity OS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root{{--bg:#212121;--panel:#171717;--card:#262626;--border:#3f3f46;--text:#ececec;--muted:#b4b4b4;--green:#10a37f;}}
@@ -979,7 +1042,7 @@ a{{color:#7dd3fc}} pre{{white-space:pre-wrap;line-height:1.55;font-family:ui-mon
 <body>
 <div class="shell">
 <aside class="sidebar">
-<div class="brand"><div class="logo">SG</div><div><h2>StreetCore V45</h2><p>Stable Ultra Pro</p></div></div>
+<div class="brand"><div class="logo">SG</div><div><h2>StreetCore V46</h2><p>Stable Ultra Pro</p></div></div>
 <div class="section-title">Sistema</div>{links}
 <div class="section-title">Tabelas</div><div class="mini-grid">{table_links}</div>
 </aside>
@@ -1043,7 +1106,7 @@ def login():
     return f"""
 <body style="background:#212121;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#262626;padding:40px;border-radius:20px;width:350px;border:1px solid #444">
-<h1>🔥 StreetCore V45</h1>{erro}
+<h1>🔥 StreetCore V46</h1>{erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px;border-radius:12px;background:#333;color:white;border:1px solid #555">
 <input name="senha" type="password" placeholder="Senha" style="width:100%;padding:14px;margin-bottom:12px;border-radius:12px;background:#333;color:white;border:1px solid #555">
@@ -1074,7 +1137,7 @@ def home():
     ]
     html = "".join([f"<div class='card'><h2>{t}</h2><div class='big'>{v}</div></div>" for t, v in cards])
     return layout(f"""
-    <h1>🚀 StreetCore V45 Omni Enterprise AI</h1>
+    <h1>🚀 StreetCore V46 Singularity OS</h1>
     <p>Painel estável, visual estilo ChatGPT, funções corrigidas e operação organizada.</p>
     <div class="grid">{html}</div>
     <div class="card"><h2>🧠 Centro de decisão</h2><pre>{relatorio_executivo()}</pre></div>
@@ -1083,7 +1146,7 @@ def home():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "online", "version": "V45 OMNI ENTERPRISE AI", "webhook": bool(WEBHOOK_URL), "ollama": USE_OLLAMA})
+    return jsonify({"status": "online", "version": "V46 SINGULARITY OS", "webhook": bool(WEBHOOK_URL), "ollama": USE_OLLAMA})
 
 
 @app.route("/workspace")
@@ -1504,7 +1567,7 @@ def backup():
 
 @app.route("/api/info")
 def api_info():
-    return jsonify({"version": "V45 OMNI ENTERPRISE AI", "api_key_header": "X-API-Key", "tables": SAFE_TABLES})
+    return jsonify({"version": "V46 SINGULARITY OS", "api_key_header": "X-API-Key", "tables": SAFE_TABLES})
 
 
 def api_auth():
@@ -1536,7 +1599,7 @@ async def send(update, texto):
 
 
 async def start_cmd(update, context):
-    await send(update, "🔥 STREETCORE V45\n/chat mensagem\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/post camisetas\n/campanha street graff\n/buscar joao")
+    await send(update, "🔥 STREETCORE V46\n/chat mensagem\n/relatorio\n/pedido camiseta joao\n/lead maria instagram\n/proposta joao 10 camisetas\n/receita 100\n/despesa 50\n/post camisetas\n/campanha street graff\n/buscar joao")
 
 
 async def chat_cmd(update, context):
@@ -1632,6 +1695,9 @@ async def telegram_main():
         "omni": omni_cmd,
         "analytics": analytics_cmd,
         "ceo": ceo_cmd,
+        "singularity": singularity_cmd,
+        "autopilot": autopilot_cmd,
+        "health": health_cmd,
     }
 
     for nome, funcao in comandos.items():
@@ -1640,16 +1706,16 @@ async def telegram_main():
     telegram_app.add_handler(MessageHandler(filters.Document.ALL, documento_cmd))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-    print("🔥 Telegram iniciando V45...")
+    print("🔥 Telegram iniciando V46...")
     await telegram_app.initialize()
     await telegram_app.start()
 
     if WEBHOOK_URL:
         await telegram_app.bot.set_webhook(f"{WEBHOOK_URL.rstrip('/')}/telegram-webhook")
-        print("✅ Telegram WEBHOOK ativo V45")
+        print("✅ Telegram WEBHOOK ativo V46")
     else:
         await telegram_app.updater.start_polling()
-        print("✅ Telegram POLLING ativo V45")
+        print("✅ Telegram POLLING ativo V46")
 
     await asyncio.Event().wait()
 
@@ -1662,7 +1728,7 @@ def run_telegram():
 
 
 # =========================
-# V45 OMNI ENTERPRISE AI EXTRA
+# V46 SINGULARITY OS EXTRA
 # =========================
 
 def gerar_contrato_texto(cliente, servico, valor):
@@ -1735,7 +1801,7 @@ def criar_templates_padrao():
 
 def luxury_resumo():
     receita, despesa, lucro = financeiro()
-    return f"""💎 V45 OMNI ENTERPRISE AI
+    return f"""💎 V46 SINGULARITY OS
 
 Status do sistema:
 ✅ Visual ChatGPT Premium
@@ -1779,7 +1845,7 @@ def luxury_page():
     if not login_required():
         return redirect("/login")
     return layout(f"""
-    <h1>💎 V45 Luxury SaaS Pro</h1>
+    <h1>💎 V46 Luxury SaaS Pro</h1>
     <div class="card"><pre>{luxury_resumo()}</pre></div>
     <div class="grid">
         <div class="card"><h2>Templates</h2><p>Modelos prontos para posts, stories e mensagens.</p><a href="/templates">Abrir</a></div>
@@ -2027,7 +2093,7 @@ async def luxury_cmd(update, context):
 
 
 # =========================
-# V45 OMNI ENTERPRISE AI EXTRA
+# V46 SINGULARITY OS EXTRA
 # =========================
 
 def palavras_chave(texto, limite=18):
@@ -2092,7 +2158,7 @@ def omni_responder(pergunta):
     contexto = relatorio_executivo() if "relatorio_executivo" in globals() else relatorio()
 
     prompt = f"""
-Você é o StreetCore V45 Omni Enterprise AI.
+Você é o StreetCore V46 Singularity OS.
 Você controla uma operação de personalizados chamada Street Graff.
 
 CONTEXTO:
@@ -2185,7 +2251,7 @@ def executar_workflows_v45():
         return "Nenhum workflow precisava ser executado agora."
 
     inserir("rotinas", "nome, descricao, status", ("workflows_v45", "\n".join(resultados), "ativa"))
-    return "⚙️ WORKFLOWS V45 EXECUTADOS\n\n" + "\n".join(["✅ " + r for r in resultados])
+    return "⚙️ WORKFLOWS V46 EXECUTADOS\n\n" + "\n".join(["✅ " + r for r in resultados])
 
 
 def analytics_omni():
@@ -2277,7 +2343,7 @@ def omni_page():
             pass
 
     return layout(f"""
-    <h1>🧠 V45 Omni Enterprise AI</h1>
+    <h1>🧠 V46 Omni Enterprise AI</h1>
     <div class="card">
         <form method="POST">
             <textarea name="pergunta" placeholder="Dê uma ordem para a IA Omni..."></textarea>
@@ -2499,6 +2565,353 @@ async def analytics_cmd(update, context):
 
 async def ceo_cmd(update, context):
     await send(update, decisao_ceo_omni())
+
+
+# =========================
+# V46 SINGULARITY OS EXTRA
+# =========================
+
+def singularity_health_check():
+    checks = []
+    checks.append(("Banco", "online", f"Tabelas ativas: {len(SAFE_TABLES)}"))
+    checks.append(("Telegram", "configurado" if TELEGRAM_TOKEN else "erro", "Token presente" if TELEGRAM_TOKEN else "Token ausente"))
+    checks.append(("Ollama", "ativo" if USE_OLLAMA and OLLAMA_URL else "opcional", OLLAMA_URL or "Sem URL Ollama"))
+    checks.append(("Webhook", "ativo" if WEBHOOK_URL else "polling", WEBHOOK_URL or "Sem webhook"))
+    checks.append(("Financeiro", "ok", f"Receita/Lucro: {financeiro()[0]:.2f}/{financeiro()[2]:.2f}"))
+    checks.append(("Memória", "ok", f"Registros RAG: {contar('rag_index') if 'rag_index' in SAFE_TABLES else 0}"))
+
+    for area, status, detalhes in checks:
+        inserir("system_health", "area, status, detalhes", (area, status, detalhes))
+
+    return "🛰️ HEALTH CHECK SINGULARITY\n\n" + "\n".join([f"{a}: {s} — {d}" for a, s, d in checks])
+
+
+def criar_planos_saas_padrao():
+    planos = [
+        ("Starter", 49.90, "1 empresa, 1 usuário, IA básica, CRM simples"),
+        ("Pro", 149.90, "3 empresas, 5 usuários, IA + automações + analytics"),
+        ("Enterprise", 499.90, "Empresas ilimitadas, multiagentes, workflows e suporte premium")
+    ]
+    criados = 0
+    for nome, preco, limites in planos:
+        if not sql("SELECT id FROM saas_planos WHERE nome=?", (nome,), True):
+            inserir("saas_planos", "nome, preco, limites, status", (nome, preco, limites, "ativo"))
+            criados += 1
+    return f"Planos SaaS verificados. Criados: {criados}"
+
+
+def criar_prompt_library_padrao():
+    prompts = [
+        ("Post viral", "marketing", "Crie um post viral para Instagram com gancho forte, CTA e hashtags."),
+        ("Follow-up venda", "vendas", "Crie uma mensagem curta para recuperar um lead que pediu orçamento."),
+        ("Resposta cliente", "atendimento", "Responda como atendente profissional da Street Graff."),
+        ("Análise CEO", "gestao", "Analise a operação e diga as 5 prioridades do dia."),
+        ("Prompt imagem", "midia", "Crie um prompt de imagem para arte urbana premium da Street Graff."),
+        ("Prompt vídeo", "midia", "Crie um roteiro de vídeo curto para Reels/TikTok de alta conversão.")
+    ]
+    criados = 0
+    for nome, cat, prompt in prompts:
+        if not sql("SELECT id FROM prompt_library WHERE nome=?", (nome,), True):
+            inserir("prompt_library", "nome, categoria, prompt, status", (nome, cat, prompt, "ativo"))
+            criados += 1
+    return f"Biblioteca de prompts verificada. Criados: {criados}"
+
+
+def criar_experimento_crescimento(nome, hipotese, acao):
+    inserir("growth_experiments", "nome, hipotese, acao, resultado, status", (nome, hipotese, acao, "Aguardando resultado", "rodando"))
+    inserir("tarefas", "titulo, status, prioridade", (f"Executar experimento: {nome}", "pendente", "alta"))
+    return f"Experimento criado: {nome}"
+
+
+def social_auto_schedule(tema):
+    post_texto = post(tema)
+    story_texto = story(tema)
+    reels_texto = reels(tema)
+
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    itens = [
+        ("instagram", "post", post_texto, hoje),
+        ("instagram", "story", story_texto, hoje),
+        ("tiktok", "reels", reels_texto, hoje),
+    ]
+
+    for rede, tipo, conteudo, data in itens:
+        inserir("social_calendar", "rede, tipo, conteudo, data, status", (rede, tipo, conteudo, data, "agendado"))
+        inserir("instagram_queue", "tipo, conteudo, legenda, status", (tipo, conteudo, f"Legenda automática sobre {tema}", "aguardando_aprovacao"))
+
+    return f"Calendário social criado para tema: {tema}\n\nPost, Story e Reels agendados."
+
+
+def agente_autonomo_executar(agente, tarefa):
+    resultado = agente_responder(agente, tarefa) if "agente_responder" in globals() else omni_responder(tarefa)
+    inserir("agent_tasks", "agente, tarefa, resultado, status", (agente, tarefa, resultado, "feito"))
+    return resultado
+
+
+def conselho_autonomo_total(objetivo):
+    agentes = ["CEO IA", "Vendas IA", "Marketing IA", "Atendimento IA", "Financeiro IA", "Produção IA", "Social Media IA"]
+    respostas = []
+    for agente in agentes:
+        tarefa = f"Objetivo geral: {objetivo}. Diga sua ação específica para hoje."
+        respostas.append(f"## {agente}\n{agente_autonomo_executar(agente, tarefa)}")
+    return "\n\n".join(respostas)
+
+
+def autopilot_singularity(modo="crescimento"):
+    resultados = []
+
+    resultados.append("1. Health check")
+    resultados.append(singularity_health_check())
+
+    resultados.append("2. Workflows")
+    resultados.append(executar_workflows_v45() if "executar_workflows_v45" in globals() else rodar_automacoes())
+
+    resultados.append("3. Decisão CEO")
+    resultados.append(decisao_ceo_omni() if "decisao_ceo_omni" in globals() else relatorio())
+
+    resultados.append("4. Social schedule")
+    resultados.append(social_auto_schedule("personalizados Street Graff"))
+
+    resultados.append("5. Agentes autônomos")
+    resultados.append(conselho_autonomo_total(f"modo {modo}: aumentar vendas e organizar operação"))
+
+    resultados.append("6. Experimento de crescimento")
+    resultados.append(criar_experimento_crescimento(
+        "Oferta relâmpago Street Graff",
+        "Ofertas com urgência aumentam conversão de leads mornos.",
+        "Criar post + story + follow-up para leads mornos."
+    ))
+
+    final = "\n\n---\n\n".join(resultados)
+    inserir("autopilot_runs", "modo, resultado, status", (modo, final, "executado"))
+    inserir("mobile_notifications", "titulo, mensagem, status", ("Autopilot executado", f"Modo {modo} finalizado.", "nova"))
+    return "🧬 AUTOPILOT SINGULARITY EXECUTADO\n\n" + final
+
+
+def singularity_dashboard():
+    receita, despesa, lucro = financeiro()
+    return f"""🧬 V46 SINGULARITY OS
+
+Resumo:
+Receita: R$ {receita:.2f}
+Despesa: R$ {despesa:.2f}
+Lucro: R$ {lucro:.2f}
+
+Operação:
+Empresas: {contar('empresas')}
+Leads: {contar('leads')}
+Pedidos: {contar('pedidos')}
+Propostas: {contar('propostas')}
+Workflows: {contar('workflow_rules')}
+Memórias RAG: {contar('rag_index')}
+Agentes: {contar('agentes')}
+Tarefas de agentes: {contar('agent_tasks')}
+Calendário social: {contar('social_calendar')}
+WhatsApp fila: {contar('whatsapp_queue')}
+Experimentos: {contar('growth_experiments')}
+
+Módulos:
+✅ Autopilot
+✅ Agentes autônomos
+✅ Memória IA
+✅ Workflow Builder
+✅ Social Calendar
+✅ SaaS Plans
+✅ Prompt Library
+✅ WhatsApp Queue
+✅ Mídia IA
+✅ CEO Mode
+✅ Health Check
+"""
+
+
+@app.route("/singularity", methods=["GET", "POST"])
+def singularity_page():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "autopilot":
+            resposta = autopilot_singularity(request.form.get("modo", "crescimento"))
+        elif acao == "health":
+            resposta = singularity_health_check()
+        elif acao == "prompts":
+            resposta = criar_prompt_library_padrao()
+        elif acao == "planos":
+            resposta = criar_planos_saas_padrao()
+        elif acao == "social":
+            resposta = social_auto_schedule(request.form.get("tema", "Street Graff"))
+        else:
+            resposta = singularity_dashboard()
+
+    return layout(f"""
+    <h1>🧬 V46 Singularity OS</h1>
+    <div class="card">
+        <form method="POST">
+            <select name="acao">
+                <option value="dashboard">Dashboard Singularity</option>
+                <option value="autopilot">Executar Autopilot</option>
+                <option value="health">Health Check</option>
+                <option value="prompts">Criar Prompt Library</option>
+                <option value="planos">Criar Planos SaaS</option>
+                <option value="social">Criar Social Schedule</option>
+            </select>
+            <input name="modo" placeholder="Modo do autopilot: crescimento, vendas, organização">
+            <input name="tema" placeholder="Tema social">
+            <button>Executar</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta or singularity_dashboard()}</pre></div>
+    """)
+
+
+@app.route("/autopilot", methods=["GET", "POST"])
+def autopilot_page():
+    if not login_required():
+        return redirect("/login")
+    resposta = ""
+    if request.method == "POST":
+        resposta = autopilot_singularity(request.form.get("modo", "crescimento"))
+    dados = listar("autopilot_runs", 20)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td><pre>{d[2][:500]}</pre></td><td>{d[3]}</td><td>{d[4]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>🤖 Autopilot</h1>
+    <div class="card">
+        <form method="POST">
+            <select name="modo"><option>crescimento</option><option>vendas</option><option>organização</option><option>marketing</option></select>
+            <button>Executar Autopilot</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    <table><tr><th>ID</th><th>Modo</th><th>Resultado</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/agent-lab", methods=["GET", "POST"])
+def agent_lab_page():
+    if not login_required():
+        return redirect("/login")
+    resposta = ""
+    if request.method == "POST":
+        resposta = agente_autonomo_executar(request.form.get("agente", "CEO IA"), request.form.get("tarefa", "Analise a operação."))
+    agentes = sql("SELECT nome FROM agentes ORDER BY id", fetch=True)
+    opts = "".join([f"<option>{a[0]}</option>" for a in agentes])
+    tarefas = listar("agent_tasks", 50)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3][:400]}</pre></td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in tarefas])
+    return layout(f"""
+    <h1>🤖 Agent Lab Autônomo</h1>
+    <div class="card">
+        <form method="POST">
+            <select name="agente">{opts}</select>
+            <textarea name="tarefa" placeholder="Missão do agente"></textarea>
+            <button>Executar agente</button>
+        </form>
+    </div>
+    <div class="card"><pre>{resposta}</pre></div>
+    <table><tr><th>ID</th><th>Agente</th><th>Tarefa</th><th>Resultado</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/social-calendar", methods=["GET", "POST"])
+def social_calendar_page():
+    if not login_required():
+        return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        msg = social_auto_schedule(request.form.get("tema", "Street Graff"))
+    dados = listar("social_calendar", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3][:400]}</pre></td><td>{d[4]}</td><td>{d[5]}</td><td>{d[6]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>📆 Social Calendar</h1>
+    <div class="card">
+        <p>{msg}</p>
+        <form method="POST">
+            <input name="tema" placeholder="Tema da campanha">
+            <button>Gerar calendário social</button>
+        </form>
+    </div>
+    <table><tr><th>ID</th><th>Rede</th><th>Tipo</th><th>Conteúdo</th><th>Data</th><th>Status</th><th>Criado</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/saas")
+def saas_page():
+    if not login_required():
+        return redirect("/login")
+    criar_planos_saas_padrao()
+    dados = listar("saas_planos", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>R$ {numero_float(d[2]):.2f}</td><td>{d[3]}</td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>🏢 SaaS Comercial</h1>
+    <div class="card"><p>Base para transformar o StreetCore em produto vendável com planos.</p></div>
+    <table><tr><th>ID</th><th>Plano</th><th>Preço</th><th>Limites</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/prompt-library")
+def prompt_library_page():
+    if not login_required():
+        return redirect("/login")
+    criar_prompt_library_padrao()
+    dados = listar("prompt_library", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td><pre>{d[3]}</pre></td><td>{d[4]}</td><td>{d[5]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>📚 Prompt Library</h1>
+    <table><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Prompt</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/experimentos", methods=["GET", "POST"])
+def experimentos_page():
+    if not login_required():
+        return redirect("/login")
+    msg = ""
+    if request.method == "POST":
+        msg = criar_experimento_crescimento(request.form.get("nome", ""), request.form.get("hipotese", ""), request.form.get("acao", ""))
+    dados = listar("growth_experiments", 100)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td><td>{d[5]}</td><td>{d[6]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>🧪 Experimentos de Crescimento</h1>
+    <div class="card">
+        <p>{msg}</p>
+        <form method="POST">
+            <input name="nome" placeholder="Nome do experimento">
+            <input name="hipotese" placeholder="Hipótese">
+            <input name="acao" placeholder="Ação">
+            <button>Criar experimento</button>
+        </form>
+    </div>
+    <table><tr><th>ID</th><th>Nome</th><th>Hipótese</th><th>Ação</th><th>Resultado</th><th>Status</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+@app.route("/health-center")
+def health_center_page():
+    if not login_required():
+        return redirect("/login")
+    resposta = singularity_health_check()
+    dados = listar("system_health", 50)
+    linhas = "".join([f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td><td>{d[4]}</td></tr>" for d in dados])
+    return layout(f"""
+    <h1>🛰️ Health Center</h1>
+    <div class="card"><pre>{resposta}</pre></div>
+    <table><tr><th>ID</th><th>Área</th><th>Status</th><th>Detalhes</th><th>Data</th></tr>{linhas}</table>
+    """)
+
+
+async def singularity_cmd(update, context):
+    await send(update, singularity_dashboard())
+
+
+async def autopilot_cmd(update, context):
+    await send(update, autopilot_singularity(" ".join(context.args) or "crescimento"))
+
+
+async def health_cmd(update, context):
+    await send(update, singularity_health_check())
 
 iniciar_banco()
 
