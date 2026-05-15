@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import asyncio
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import Flask, jsonify, request, redirect, session, Response, send_file
 from telegram import Update
@@ -64,7 +64,6 @@ TABLES = {
         nivel TEXT DEFAULT 'admin',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "pedidos": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -73,7 +72,6 @@ TABLES = {
         valor REAL DEFAULT 0,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "leads": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -82,7 +80,6 @@ TABLES = {
         temperatura TEXT DEFAULT 'frio',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "clientes": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -90,7 +87,6 @@ TABLES = {
         historico TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "financeiro": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tipo TEXT,
@@ -98,7 +94,6 @@ TABLES = {
         descricao TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "produtos": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -106,7 +101,6 @@ TABLES = {
         descricao TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "estoque": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT,
@@ -114,7 +108,6 @@ TABLES = {
         minimo INTEGER DEFAULT 5,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "producao": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT,
@@ -122,7 +115,6 @@ TABLES = {
         status TEXT DEFAULT 'aguardando',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "tarefas": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT,
@@ -130,7 +122,6 @@ TABLES = {
         prioridade TEXT DEFAULT 'normal',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "campanhas": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tema TEXT,
@@ -138,7 +129,6 @@ TABLES = {
         status TEXT DEFAULT 'planejada',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "conteudos": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tema TEXT,
@@ -147,7 +137,6 @@ TABLES = {
         status TEXT DEFAULT 'rascunho',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "propostas": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente TEXT,
@@ -157,7 +146,6 @@ TABLES = {
         status TEXT DEFAULT 'aberta',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "documentos": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT,
@@ -165,14 +153,12 @@ TABLES = {
         texto TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "conhecimento": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT,
         texto TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "uploads": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -180,7 +166,6 @@ TABLES = {
         texto TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "atendimentos": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente TEXT,
@@ -188,21 +173,18 @@ TABLES = {
         resposta TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "fornecedores": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
         contato TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "notificacoes": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
         status TEXT DEFAULT 'nova',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "metas": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -210,7 +192,6 @@ TABLES = {
         status TEXT DEFAULT 'ativa',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "automacoes": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -218,14 +199,12 @@ TABLES = {
         status TEXT DEFAULT 'ativa',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "memoria": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chave TEXT,
         valor TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "agentes": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -233,7 +212,6 @@ TABLES = {
         ultima_resposta TEXT,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "instagram_queue": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tipo TEXT,
@@ -242,7 +220,6 @@ TABLES = {
         status TEXT DEFAULT 'aguardando_aprovacao',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """,
-
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -252,26 +229,13 @@ TABLES = {
 
 SAFE_TABLES = list(TABLES.keys())
 
-
 MIGRATIONS = {
-    "leads": {
-        "temperatura": "TEXT DEFAULT 'frio'"
-    },
-    "estoque": {
-        "minimo": "INTEGER DEFAULT 5"
-    },
-    "tarefas": {
-        "prioridade": "TEXT DEFAULT 'normal'"
-    },
-    "pedidos": {
-        "valor": "REAL DEFAULT 0"
-    },
-    "conteudos": {
-        "status": "TEXT DEFAULT 'rascunho'"
-    },
-    "propostas": {
-        "status": "TEXT DEFAULT 'aberta'"
-    }
+    "leads": {"temperatura": "TEXT DEFAULT 'frio'"},
+    "estoque": {"minimo": "INTEGER DEFAULT 5"},
+    "tarefas": {"prioridade": "TEXT DEFAULT 'normal'"},
+    "pedidos": {"valor": "REAL DEFAULT 0"},
+    "conteudos": {"status": "TEXT DEFAULT 'rascunho'"},
+    "propostas": {"status": "TEXT DEFAULT 'aberta'"},
 }
 
 
@@ -295,7 +259,6 @@ def iniciar_banco():
 
     for tabela, colunas in MIGRATIONS.items():
         existentes = [c[1] for c in sql(f"PRAGMA table_info({tabela})", fetch=True)]
-
         for coluna, tipo in colunas.items():
             if coluna not in existentes:
                 try:
@@ -361,7 +324,9 @@ def login_required():
 
 def is_admin():
     return session.get("nivel") == "admin"
-    def limpar_nome(nome):
+
+
+def limpar_nome(nome):
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", nome or "arquivo")
 
 
@@ -389,10 +354,8 @@ def extrair_pdf(path):
 def extrair_arquivo(path):
     if path.lower().endswith(".txt"):
         return extrair_txt(path)
-
     if path.lower().endswith(".pdf"):
         return extrair_pdf(path)
-
     return ""
 
 
@@ -417,7 +380,7 @@ def ollama(prompt):
             data = json.loads(res.read().decode("utf-8"))
             return data.get("response", "")
 
-    except Exception as e:
+    except Exception:
         return ""
 
 
@@ -431,10 +394,8 @@ def memoria_buscar(chave):
         (f"%{chave}%",),
         True
     )
-
     if not dados:
         return ""
-
     return "\n".join([d[0] for d in dados])
 
 
@@ -446,9 +407,7 @@ Produtos: camisetas, adesivos, canecas, panfletos e brindes.
 Tom: jovem, direto, street, vendedor.
 Inclua CTA e hashtags.
 """
-
     ia = ollama(prompt)
-
     if ia:
         return ia
 
@@ -460,7 +419,7 @@ A Street Graff cria camisetas, adesivos, canecas, panfletos e brindes personaliz
 📲 Chama no direct e peça seu orçamento.
 Pagamento via PIX.
 
-#streetgraff #personalizados #camisetaspersonalizadas #adesivospersonalizados #canecaspersonalizadas"""
+#streetgraff #personalizados #camisetaspersonalizadas"""
 
 
 def story(tema):
@@ -501,15 +460,12 @@ def campanha(tema):
 4. Salvar leads.
 5. Chamar clientes no direct.
 """
-
     inserir("campanhas", "tema, texto, status", (tema, texto, "planejada"))
-
     return texto
 
 
 def valor_orcamento(desc):
     t = desc.lower()
-
     base = 35
 
     if "camiseta" in t:
@@ -524,7 +480,6 @@ def valor_orcamento(desc):
         base = 20
 
     qtd = 1
-
     for palavra in t.replace(",", " ").split():
         if palavra.isdigit():
             qtd = int(palavra)
@@ -538,7 +493,6 @@ def valor_orcamento(desc):
 
 def gerar_proposta(cliente, desc):
     valor = valor_orcamento(desc)
-
     texto = f"""🧾 PROPOSTA COMERCIAL STREET GRAFF
 
 Cliente: {cliente}
@@ -555,7 +509,6 @@ Prazo: 5 dias úteis + transporte.
 Pagamento: somente via PIX.
 
 Para confirmar, envie arte/referência e quantidade final."""
-
     return texto
 
 
@@ -579,30 +532,22 @@ def faq(pergunta):
 
     if "prazo" in p:
         return "Prazo padrão: 5 dias úteis de produção + transporte."
-
     if "pagamento" in p or "pix" in p:
         return "Pagamento somente via PIX."
-
     if "orçamento" in p or "orcamento" in p:
         return "Informe produto, quantidade, tamanho e se já possui arte."
-
     if "camiseta" in p:
         return "Fazemos camisetas personalizadas. Valor depende da quantidade e da arte."
-
     if "caneca" in p:
         return "Fazemos canecas personalizadas sob encomenda."
-
     if "adesivo" in p:
         return "Fazemos adesivos personalizados em vários tamanhos."
-
     if "panfleto" in p:
         return "Fazemos panfletos personalizados para divulgação."
-
     if "brinde" in p:
         return "Fazemos brindes personalizados conforme o pedido."
 
     ia = ollama(f"Responda como atendente da Street Graff: {pergunta}")
-
     if ia:
         return ia
 
@@ -630,27 +575,13 @@ def plano():
 
 def relatorio():
     receita, despesa, lucro = financeiro()
-
     linhas = []
 
     for tabela in [
-        "pedidos",
-        "leads",
-        "clientes",
-        "propostas",
-        "produtos",
-        "estoque",
-        "producao",
-        "tarefas",
-        "campanhas",
-        "conteudos",
-        "documentos",
-        "conhecimento",
-        "uploads",
-        "atendimentos",
-        "automacoes",
-        "agentes",
-        "instagram_queue"
+        "pedidos", "leads", "clientes", "propostas", "produtos", "estoque",
+        "producao", "tarefas", "campanhas", "conteudos", "documentos",
+        "conhecimento", "uploads", "atendimentos", "automacoes",
+        "agentes", "instagram_queue"
     ]:
         linhas.append(f"{tabela}: {contar(tabela)}")
 
@@ -672,9 +603,7 @@ Decisão:
 
 def buscar(termo):
     like = f"%{termo}%"
-
     blocos = []
-
     pesquisas = {
         "pedidos": "nome LIKE ? OR cliente LIKE ?",
         "leads": "nome LIKE ? OR origem LIKE ? OR status LIKE ? OR temperatura LIKE ?",
@@ -689,13 +618,11 @@ def buscar(termo):
     for tabela, where in pesquisas.items():
         params = tuple([like] * where.count("?"))
         dados = sql(f"SELECT * FROM {tabela} WHERE {where} LIMIT 20", params, True)
-
         if dados:
             blocos.append(f"{tabela.upper()}:\n" + "\n".join(map(str, dados)))
 
     if not blocos:
         return "Nenhum resultado encontrado."
-
     return "\n\n".join(blocos)
 
 
@@ -723,24 +650,17 @@ def gerar_pdf_proposta(cliente, desc):
             c.showPage()
             c.setFont("Helvetica", 11)
             y = height - 50
-
         c.drawString(50, y, linha[:95])
         y -= 17
 
     c.save()
     buffer.seek(0)
-
     return buffer, "pdf"
 
 
 def agente_responder(nome, pergunta):
     dados = sql("SELECT funcao FROM agentes WHERE nome=?", (nome,), True)
-
-    if dados:
-        funcao = dados[0][0]
-    else:
-        funcao = "Agente geral"
-
+    funcao = dados[0][0] if dados else "Agente geral"
     contexto = relatorio()
 
     prompt = f"""
@@ -755,7 +675,6 @@ Pergunta/comando:
 
 Responda de forma prática, direta e operacional.
 """
-
     ia = ollama(prompt)
 
     if not ia:
@@ -772,67 +691,32 @@ Recomendação:
 Comando recebido:
 {pergunta}"""
 
-    sql(
-        "UPDATE agentes SET ultima_resposta=? WHERE nome=?",
-        (ia, nome)
-    )
-
+    sql("UPDATE agentes SET ultima_resposta=? WHERE nome=?", (ia, nome))
     return ia
 
 
 def conselho_multiagentes(comando):
     agentes = [
-        "CEO IA",
-        "Vendas IA",
-        "Marketing IA",
-        "Atendimento IA",
-        "Financeiro IA",
-        "Produção IA",
-        "Social Media IA"
+        "CEO IA", "Vendas IA", "Marketing IA", "Atendimento IA",
+        "Financeiro IA", "Produção IA", "Social Media IA"
     ]
-
     respostas = []
-
     for ag in agentes:
         respostas.append(f"### {ag}\n{agente_responder(ag, comando)}")
-
     return "\n\n".join(respostas)
 
 
 def rodar_automacoes():
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    inserir(
-        "tarefas",
-        "titulo, status, prioridade",
-        (f"Revisar leads novos - {agora}", "pendente", "alta")
-    )
-
-    inserir(
-        "notificacoes",
-        "mensagem, status",
-        (f"Rodar campanha diária - {agora}", "nova")
-    )
+    inserir("tarefas", "titulo, status, prioridade", (f"Revisar leads novos - {agora}", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", (f"Rodar campanha diária - {agora}", "nova"))
 
     texto_post = post("Street Graff")
 
-    inserir(
-        "conteudos",
-        "tema, tipo, texto, status",
-        ("Street Graff", "post_auto", texto_post, "rascunho")
-    )
-
-    inserir(
-        "instagram_queue",
-        "tipo, conteudo, legenda, status",
-        ("post", texto_post, "Legenda gerada automaticamente.", "aguardando_aprovacao")
-    )
-
-    inserir(
-        "automacoes",
-        "nome, acao, status",
-        ("auto_diaria", f"Executada em {agora}", "ativa")
-    )
+    inserir("conteudos", "tema, tipo, texto, status", ("Street Graff", "post_auto", texto_post, "rascunho"))
+    inserir("instagram_queue", "tipo, conteudo, legenda, status", ("post", texto_post, "Legenda gerada automaticamente.", "aguardando_aprovacao"))
+    inserir("automacoes", "nome, acao, status", ("auto_diaria", f"Executada em {agora}", "ativa"))
 
     return "Automações executadas: tarefa, notificação, post e fila Instagram criados."
 
@@ -843,11 +727,9 @@ def scheduler_loop():
     while True:
         try:
             agora = datetime.now()
-
             if agora.hour == 9 and ultima_execucao != agora.date():
                 rodar_automacoes()
                 ultima_execucao = agora.date()
-
         except Exception as e:
             log(f"Erro scheduler: {e}")
 
@@ -879,27 +761,11 @@ def layout(conteudo):
     ]
 
     tables = [
-        "pedidos",
-        "leads",
-        "clientes",
-        "produtos",
-        "estoque",
-        "producao",
-        "tarefas",
-        "campanhas",
-        "conteudos",
-        "documentos",
-        "conhecimento",
-        "uploads",
-        "atendimentos",
-        "fornecedores",
-        "notificacoes",
-        "metas",
-        "automacoes",
-        "memoria",
-        "agentes",
-        "instagram_queue",
-        "logs"
+        "pedidos", "leads", "clientes", "produtos", "estoque",
+        "producao", "tarefas", "campanhas", "conteudos",
+        "documentos", "conhecimento", "uploads", "atendimentos",
+        "fornecedores", "notificacoes", "metas", "automacoes",
+        "memoria", "agentes", "instagram_queue", "logs"
     ]
 
     links = "".join([f"<a href='{url}'>{nome}</a>" for nome, url in menu])
@@ -910,141 +776,37 @@ def layout(conteudo):
 <head>
 <title>StreetCore V35 Neural Empire</title>
 <style>
-body{{
-    margin:0;
-    background:#050505;
-    color:#fff;
-    font-family:Arial;
-}}
-
-.sidebar{{
-    position:fixed;
-    top:0;
-    left:0;
-    bottom:0;
-    width:315px;
-    background:#0b0b0b;
-    border-right:1px solid #222;
-    padding:24px;
-    overflow:auto;
-}}
-
-.sidebar h2{{
-    color:#00ff88;
-}}
-
-.sidebar a{{
-    display:block;
-    color:white;
-    text-decoration:none;
-    margin:11px 0;
-}}
-
-.sidebar a:hover{{
-    color:#00ff88;
-}}
-
-.main{{
-    margin-left:365px;
-    padding:30px;
-}}
-
-.grid{{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
-    gap:18px;
-}}
-
-.card{{
-    background:#111;
-    border:1px solid #333;
-    border-radius:18px;
-    padding:22px;
-    margin-bottom:18px;
-}}
-
-.big{{
-    color:#00ff88;
-    font-size:34px;
-    font-weight:bold;
-}}
-
-input,select,textarea{{
-    padding:12px;
-    border-radius:10px;
-    border:0;
-    margin:6px 0;
-    width:100%;
-    background:#1c1c1c;
-    color:white;
-}}
-
-textarea{{
-    min-height:170px;
-}}
-
-button{{
-    padding:12px 18px;
-    border:0;
-    border-radius:10px;
-    background:#00ff88;
-    font-weight:bold;
-    cursor:pointer;
-}}
-
-table{{
-    width:100%;
-    border-collapse:collapse;
-    background:#111;
-}}
-
-th,td{{
-    padding:12px;
-    border-bottom:1px solid #333;
-    vertical-align:top;
-}}
-
-a{{
-    color:#00ff88;
-}}
-
-pre{{
-    white-space:pre-wrap;
-}}
-
-.bar{{
-    background:#00ff88;
-    height:18px;
-    border-radius:10px;
-}}
-
+body{{margin:0;background:#050505;color:#fff;font-family:Arial;}}
+.sidebar{{position:fixed;top:0;left:0;bottom:0;width:315px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto;}}
+.sidebar h2{{color:#00ff88;}}
+.sidebar a{{display:block;color:white;text-decoration:none;margin:11px 0;}}
+.sidebar a:hover{{color:#00ff88;}}
+.main{{margin-left:365px;padding:30px;}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px;}}
+.card{{background:#111;border:1px solid #333;border-radius:18px;padding:22px;margin-bottom:18px;}}
+.big{{color:#00ff88;font-size:34px;font-weight:bold;}}
+input,select,textarea{{padding:12px;border-radius:10px;border:0;margin:6px 0;width:100%;background:#1c1c1c;color:white;}}
+textarea{{min-height:170px;}}
+button{{padding:12px 18px;border:0;border-radius:10px;background:#00ff88;font-weight:bold;cursor:pointer;}}
+table{{width:100%;border-collapse:collapse;background:#111;}}
+th,td{{padding:12px;border-bottom:1px solid #333;vertical-align:top;}}
+a{{color:#00ff88;}}
+pre{{white-space:pre-wrap;}}
+.bar{{background:#00ff88;height:18px;border-radius:10px;}}
 @media print{{
-    .sidebar{{
-        display:none;
-    }}
-    .main{{
-        margin-left:0;
-    }}
-    body{{
-        background:white;
-        color:black;
-    }}
-    .card{{
-        border:1px solid #999;
-        background:white;
-        color:black;
-    }}
+.sidebar{{display:none;}}
+.main{{margin-left:0;}}
+body{{background:white;color:black;}}
+.card{{border:1px solid #999;background:white;color:black;}}
 }}
 </style>
 </head>
-
 <body>
 <div class="sidebar">
 <h2>🔥 StreetCore V35</h2>
 {links}
 <a href="/logout">Sair</a>
 </div>
-
 <div class="main">
 {conteudo}
 </div>
@@ -1103,23 +865,12 @@ def home():
         return redirect("/login")
 
     receita, despesa, lucro = financeiro()
-
     cards = ""
 
     for tabela in [
-        "pedidos",
-        "leads",
-        "clientes",
-        "propostas",
-        "conteudos",
-        "uploads",
-        "produtos",
-        "estoque",
-        "producao",
-        "tarefas",
-        "atendimentos",
-        "agentes",
-        "instagram_queue"
+        "pedidos", "leads", "clientes", "propostas", "conteudos",
+        "uploads", "produtos", "estoque", "producao", "tarefas",
+        "atendimentos", "agentes", "instagram_queue"
     ]:
         cards += f"""
         <div class="card">
@@ -1129,44 +880,25 @@ def home():
         """
 
     cards += f"""
-    <div class="card">
-        <h2>Receita</h2>
-        <div class="big">R$ {receita:.2f}</div>
-    </div>
-
-    <div class="card">
-        <h2>Lucro</h2>
-        <div class="big">R$ {lucro:.2f}</div>
-    </div>
+    <div class="card"><h2>Receita</h2><div class="big">R$ {receita:.2f}</div></div>
+    <div class="card"><h2>Lucro</h2><div class="big">R$ {lucro:.2f}</div></div>
     """
 
     grafico = f"""
     <div class="card">
         <h2>Gráfico rápido</h2>
-        <p>Receita</p>
-        <div class="bar" style="width:{min(receita / 10, 100)}%"></div>
-
-        <p>Despesa</p>
-        <div class="bar" style="width:{min(despesa / 10, 100)}%"></div>
-
-        <p>Lucro</p>
-        <div class="bar" style="width:{min(max(lucro, 0) / 10, 100)}%"></div>
+        <p>Receita</p><div class="bar" style="width:{min(receita / 10, 100)}%"></div>
+        <p>Despesa</p><div class="bar" style="width:{min(despesa / 10, 100)}%"></div>
+        <p>Lucro</p><div class="bar" style="width:{min(max(lucro, 0) / 10, 100)}%"></div>
     </div>
     """
 
     return layout(f"""
     <h1>🔥 STREETCORE OS V35 NEURAL EMPIRE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
-
-    <div class="grid">
-        {cards}
-    </div>
-
+    <div class="grid">{cards}</div>
     {grafico}
-
-    <div class="card">
-        <pre>{plano()}</pre>
-    </div>
+    <div class="card"><pre>{plano()}</pre></div>
     """)
 
 
@@ -1179,7 +911,9 @@ def health():
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
     })
-    @app.route("/neural", methods=["GET", "POST"])
+
+
+@app.route("/neural", methods=["GET", "POST"])
 def neural():
     if not login_required():
         return redirect("/login")
@@ -1192,17 +926,13 @@ def neural():
 
     return layout(f"""
     <h1>🧠 Neural Center</h1>
-
     <div class="card">
         <form method="POST">
             <input name="comando" placeholder="Ex: como vender mais camisetas hoje?">
             <button>Analisar com multiagentes</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{resposta}</pre>
-    </div>
+    <div class="card"><pre>{resposta}</pre></div>
     """)
 
 
@@ -1219,30 +949,18 @@ def multiagentes():
         resposta = agente_responder(agente, pergunta)
 
     agentes = sql("SELECT nome FROM agentes ORDER BY id", fetch=True)
-
-    opcoes = "".join([
-        f"<option value='{a[0]}'>{a[0]}</option>"
-        for a in agentes
-    ])
+    opcoes = "".join([f"<option value='{a[0]}'>{a[0]}</option>" for a in agentes])
 
     return layout(f"""
     <h1>🤖 Multiagentes IA</h1>
-
     <div class="card">
         <form method="POST">
-            <select name="agente">
-                {opcoes}
-            </select>
-
+            <select name="agente">{opcoes}</select>
             <textarea name="pergunta" placeholder="Digite a missão para o agente"></textarea>
-
             <button>Executar agente</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{resposta}</pre>
-    </div>
+    <div class="card"><pre>{resposta}</pre></div>
     """)
 
 
@@ -1266,33 +984,23 @@ def conteudo():
         else:
             resultado = post(tema)
 
-        inserir(
-            "conteudos",
-            "tema, tipo, texto, status",
-            (tema, tipo, resultado, "rascunho")
-        )
+        inserir("conteudos", "tema, tipo, texto, status", (tema, tipo, resultado, "rascunho"))
 
     return layout(f"""
     <h1>🤖 Conteúdo IA</h1>
-
     <div class="card">
         <form method="POST">
             <input name="tema" placeholder="Tema">
-
             <select name="tipo">
                 <option value="post">Post</option>
                 <option value="story">Story</option>
                 <option value="reels">Reels</option>
                 <option value="campanha">Campanha</option>
             </select>
-
             <button>Gerar</button>
         </form>
     </div>
-
-    <div class="card">
-        <textarea>{resultado}</textarea>
-    </div>
+    <div class="card"><textarea>{resultado}</textarea></div>
     """)
 
 
@@ -1311,14 +1019,9 @@ def aprovacoes():
     linhas = "".join([
         f"""
         <tr>
-            <td>{d[0]}</td>
-            <td>{d[1]}</td>
-            <td>{d[2]}</td>
-            <td><pre>{d[3]}</pre></td>
-            <td>{d[4]}</td>
-            <td>
-                <a href="/aprovar/{d[0]}">Aprovar</a>
-            </td>
+            <td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td>
+            <td><pre>{d[3]}</pre></td><td>{d[4]}</td>
+            <td><a href="/aprovar/{d[0]}">Aprovar</a></td>
         </tr>
         """
         for d in dados
@@ -1326,16 +1029,8 @@ def aprovacoes():
 
     return layout(f"""
     <h1>✅ Aprovação de Posts</h1>
-
     <table>
-        <tr>
-            <th>ID</th>
-            <th>Tema</th>
-            <th>Tipo</th>
-            <th>Texto</th>
-            <th>Status</th>
-            <th>Ação</th>
-        </tr>
+        <tr><th>ID</th><th>Tema</th><th>Tipo</th><th>Texto</th><th>Status</th><th>Ação</th></tr>
         {linhas}
     </table>
     """)
@@ -1345,12 +1040,7 @@ def aprovacoes():
 def aprovar(item_id):
     if not login_required():
         return redirect("/login")
-
-    sql(
-        "UPDATE conteudos SET status='aprovado' WHERE id=?",
-        (item_id,)
-    )
-
+    sql("UPDATE conteudos SET status='aprovado' WHERE id=?", (item_id,))
     return redirect("/aprovacoes")
 
 
@@ -1360,34 +1050,16 @@ def instagram():
         return redirect("/login")
 
     dados = listar("instagram_queue", 100)
-
     linhas = "".join([
-        f"""
-        <tr>
-            <td>{d[0]}</td>
-            <td>{d[1]}</td>
-            <td><pre>{d[2]}</pre></td>
-            <td>{d[3]}</td>
-            <td>{d[4]}</td>
-            <td>{d[5]}</td>
-        </tr>
-        """
+        f"<tr><td>{d[0]}</td><td>{d[1]}</td><td><pre>{d[2]}</pre></td><td>{d[3]}</td><td>{d[4]}</td><td>{d[5]}</td></tr>"
         for d in dados
     ])
 
     return layout(f"""
     <h1>📲 Instagram Queue</h1>
     <p>Fila semi-automática: gere, aprove e poste manualmente ou integre API depois.</p>
-
     <table>
-        <tr>
-            <th>ID</th>
-            <th>Tipo</th>
-            <th>Conteúdo</th>
-            <th>Legenda</th>
-            <th>Status</th>
-            <th>Data</th>
-        </tr>
+        <tr><th>ID</th><th>Tipo</th><th>Conteúdo</th><th>Legenda</th><th>Status</th><th>Data</th></tr>
         {linhas}
     </table>
     """)
@@ -1404,16 +1076,10 @@ def propostas():
         cliente = request.form.get("cliente")
         descricao = request.form.get("descricao")
         resultado = gerar_proposta(cliente, descricao)
-
-        inserir(
-            "propostas",
-            "cliente, descricao, valor, texto",
-            (cliente, descricao, valor_orcamento(descricao), resultado)
-        )
+        inserir("propostas", "cliente, descricao, valor, texto", (cliente, descricao, valor_orcamento(descricao), resultado))
 
     return layout(f"""
     <h1>🧾 Propostas</h1>
-
     <div class="card">
         <form method="POST">
             <input name="cliente" placeholder="Cliente">
@@ -1421,10 +1087,7 @@ def propostas():
             <button>Gerar proposta</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{resultado}</pre>
-    </div>
+    <div class="card"><pre>{resultado}</pre></div>
     """)
 
 
@@ -1436,27 +1099,15 @@ def pdf_proposta():
     if request.method == "POST":
         cliente = request.form.get("cliente")
         descricao = request.form.get("descricao")
-
         buffer, tipo = gerar_pdf_proposta(cliente, descricao)
 
         if tipo == "pdf":
-            return send_file(
-                buffer,
-                as_attachment=True,
-                download_name="proposta_streetgraff.pdf",
-                mimetype="application/pdf"
-            )
+            return send_file(buffer, as_attachment=True, download_name="proposta_streetgraff.pdf", mimetype="application/pdf")
 
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name="proposta_streetgraff.txt",
-            mimetype="text/plain"
-        )
+        return send_file(buffer, as_attachment=True, download_name="proposta_streetgraff.txt", mimetype="text/plain")
 
     return layout("""
     <h1>📄 Gerar PDF de Proposta</h1>
-
     <div class="card">
         <form method="POST">
             <input name="cliente" placeholder="Cliente">
@@ -1478,16 +1129,10 @@ def atendimento():
         cliente = request.form.get("cliente", "cliente")
         pergunta = request.form.get("pergunta", "")
         resposta = faq(pergunta)
-
-        inserir(
-            "atendimentos",
-            "cliente, pergunta, resposta",
-            (cliente, pergunta, resposta)
-        )
+        inserir("atendimentos", "cliente, pergunta, resposta", (cliente, pergunta, resposta))
 
     return layout(f"""
     <h1>💬 Atendimento IA</h1>
-
     <div class="card">
         <form method="POST">
             <input name="cliente" placeholder="Cliente">
@@ -1495,10 +1140,7 @@ def atendimento():
             <button>Responder</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{resposta}</pre>
-    </div>
+    <div class="card"><pre>{resposta}</pre></div>
     """)
 
 
@@ -1511,40 +1153,24 @@ def upload():
 
     if request.method == "POST":
         file = request.files.get("arquivo")
-
         if file:
             nome = limpar_nome(file.filename)
             path = os.path.join(UPLOAD_FOLDER, nome)
             file.save(path)
-
             texto = extrair_arquivo(path)
-
-            inserir(
-                "uploads",
-                "nome, tipo, texto",
-                (nome, nome.split(".")[-1].lower(), texto[:12000])
-            )
-
-            inserir(
-                "conhecimento",
-                "titulo, texto",
-                (f"Upload: {nome}", texto[:12000])
-            )
-
+            inserir("uploads", "nome, tipo, texto", (nome, nome.split(".")[-1].lower(), texto[:12000]))
+            inserir("conhecimento", "titulo, texto", (f"Upload: {nome}", texto[:12000]))
             msg = f"Arquivo salvo e lido: {nome}"
 
     return layout(f"""
     <h1>📎 Upload TXT/PDF</h1>
-
     <div class="card">
         <p>{msg}</p>
-
         <form method="POST" enctype="multipart/form-data">
             <input type="file" name="arquivo">
             <button>Enviar</button>
         </form>
     </div>
-
     <pre>{listar("uploads", 20)}</pre>
     """)
 
@@ -1561,17 +1187,13 @@ def buscar_web():
 
     return layout(f"""
     <h1>🔎 Busca Inteligente</h1>
-
     <div class="card">
         <form method="POST">
             <input name="termo" placeholder="Buscar em pedidos, leads, uploads, conhecimento...">
             <button>Buscar</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{resultado}</pre>
-    </div>
+    <div class="card"><pre>{resultado}</pre></div>
     """)
 
 
@@ -1587,17 +1209,12 @@ def automacoes():
 
     return layout(f"""
     <h1>⚙️ Automações</h1>
-
     <div class="card">
         <form method="POST">
             <button>Rodar automações agora</button>
         </form>
     </div>
-
-    <div class="card">
-        <pre>{msg}</pre>
-    </div>
-
+    <div class="card"><pre>{msg}</pre></div>
     <pre>{listar("automacoes")}</pre>
     """)
 
@@ -1606,7 +1223,6 @@ def automacoes():
 def usuarios():
     if not login_required():
         return redirect("/login")
-
     if not is_admin():
         return "Apenas admin."
 
@@ -1614,40 +1230,25 @@ def usuarios():
 
     if request.method == "POST":
         try:
-            inserir(
-                "usuarios",
-                "usuario, senha, nivel",
-                (
-                    request.form.get("usuario"),
-                    request.form.get("senha"),
-                    request.form.get("nivel")
-                )
-            )
-
+            inserir("usuarios", "usuario, senha, nivel", (request.form.get("usuario"), request.form.get("senha"), request.form.get("nivel")))
             msg = "Usuário criado."
-
         except Exception as e:
             msg = f"Erro: {e}"
 
     return layout(f"""
     <h1>👤 Usuários</h1>
-
     <div class="card">
         <p>{msg}</p>
-
         <form method="POST">
             <input name="usuario" placeholder="Usuário">
             <input name="senha" placeholder="Senha">
-
             <select name="nivel">
                 <option value="admin">admin</option>
                 <option value="operador">operador</option>
             </select>
-
             <button>Criar</button>
         </form>
     </div>
-
     <pre>{listar("usuarios")}</pre>
     """)
 
@@ -1661,9 +1262,7 @@ def cliente_publico():
 <p>Camisetas, adesivos, canecas, panfletos e brindes personalizados.</p>
 <p>Pagamento somente via PIX.</p>
 <p>Prazo: 5 dias úteis + transporte.</p>
-
 <h2>Peça orçamento</h2>
-
 <form action="/cliente-orcamento" method="POST">
 <input name="cliente" placeholder="Seu nome" style="padding:12px;width:100%;margin:6px">
 <textarea name="descricao" placeholder="O que você quer?" style="padding:12px;width:100%;height:120px;margin:6px"></textarea>
@@ -1680,17 +1279,8 @@ def cliente_orcamento():
     descricao = request.form.get("descricao")
     texto = gerar_proposta(cliente, descricao)
 
-    inserir(
-        "leads",
-        "nome, origem, temperatura",
-        (cliente, "modo_cliente", "quente")
-    )
-
-    inserir(
-        "propostas",
-        "cliente, descricao, valor, texto",
-        (cliente, descricao, valor_orcamento(descricao), texto)
-    )
+    inserir("leads", "nome, origem, temperatura", (cliente, "modo_cliente", "quente"))
+    inserir("propostas", "cliente, descricao, valor, texto", (cliente, descricao, valor_orcamento(descricao), texto))
 
     return f"<pre>{texto}</pre><a href='/cliente'>Voltar</a>"
 
@@ -1704,22 +1294,10 @@ def financeiro_web():
 
     return layout(f"""
     <h1>💵 Financeiro</h1>
-
     <div class="grid">
-        <div class="card">
-            <h2>Receita</h2>
-            <div class="big">R$ {receita:.2f}</div>
-        </div>
-
-        <div class="card">
-            <h2>Despesa</h2>
-            <div class="big">R$ {despesa:.2f}</div>
-        </div>
-
-        <div class="card">
-            <h2>Lucro</h2>
-            <div class="big">R$ {lucro:.2f}</div>
-        </div>
+        <div class="card"><h2>Receita</h2><div class="big">R$ {receita:.2f}</div></div>
+        <div class="card"><h2>Despesa</h2><div class="big">R$ {despesa:.2f}</div></div>
+        <div class="card"><h2>Lucro</h2><div class="big">R$ {lucro:.2f}</div></div>
     </div>
     """)
 
@@ -1731,10 +1309,7 @@ def relatorio_web():
 
     return layout(f"""
     <h1>📊 Relatório Neural Empire</h1>
-
-    <div class="card">
-        <pre>{relatorio()}</pre>
-    </div>
+    <div class="card"><pre>{relatorio()}</pre></div>
     """)
 
 
@@ -1747,11 +1322,8 @@ def table(tabela):
         return "Tabela não permitida"
 
     dados = listar(tabela, 1000)
-
     linhas = "".join([
-        "<tr>" +
-        "".join([f"<td>{x}</td>" for x in d]) +
-        f"<td><a href='/delete/{tabela}/{d[0]}'>Excluir</a></td></tr>"
+        "<tr>" + "".join([f"<td>{x}</td>" for x in d]) + f"<td><a href='/delete/{tabela}/{d[0]}'>Excluir</a></td></tr>"
         for d in dados
     ])
 
@@ -1766,13 +1338,10 @@ def table(tabela):
 def delete(tabela, item_id):
     if not login_required():
         return redirect("/login")
-
     if not is_admin():
         return "Apenas admin."
-
     if tabela in SAFE_TABLES:
         sql(f"DELETE FROM {tabela} WHERE id=?", (item_id,))
-
     return redirect(f"/table/{tabela}")
 
 
@@ -1780,7 +1349,6 @@ def delete(tabela, item_id):
 def export(tabela):
     if not login_required():
         return redirect("/login")
-
     if tabela not in SAFE_TABLES:
         return "Tabela não permitida"
 
@@ -1791,11 +1359,7 @@ def export(tabela):
     for row in rows:
         writer.writerow(row)
 
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={tabela}.csv"}
-    )
+    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": f"attachment;filename={tabela}.csv"})
 
 
 @app.route("/backup")
@@ -1810,18 +1374,13 @@ def backup():
     with open(destino, "rb") as f:
         data = f.read()
 
-    return Response(
-        data,
-        mimetype="application/octet-stream",
-        headers={"Content-Disposition": f"attachment;filename={nome}"}
-    )
+    return Response(data, mimetype="application/octet-stream", headers={"Content-Disposition": f"attachment;filename={nome}"})
 
 
 @app.route("/restore", methods=["GET", "POST"])
 def restore():
     if not login_required():
         return redirect("/login")
-
     if not is_admin():
         return "Apenas admin."
 
@@ -1829,25 +1388,17 @@ def restore():
 
     if request.method == "POST":
         file = request.files.get("backup")
-
         if file and file.filename.endswith(".db"):
-            safety = os.path.join(
-                BACKUP_FOLDER,
-                f"before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-            )
-
+            safety = os.path.join(BACKUP_FOLDER, f"before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
             shutil.copy(DB_PATH, safety)
             file.save(DB_PATH)
             iniciar_banco()
-
             msg = "Backup restaurado. Backup de segurança criado antes da restauração."
 
     return layout(f"""
     <h1>♻️ Restaurar Backup</h1>
-
     <div class="card">
         <p>{msg}</p>
-
         <form method="POST" enctype="multipart/form-data">
             <input type="file" name="backup">
             <button>Restaurar</button>
@@ -1873,7 +1424,6 @@ def api_auth():
 def api_relatorio():
     if not api_auth():
         return jsonify({"erro": "API key inválida"}), 403
-
     return jsonify({"relatorio": relatorio()})
 
 
@@ -1881,10 +1431,8 @@ def api_relatorio():
 def api_table(tabela):
     if not api_auth():
         return jsonify({"erro": "API key inválida"}), 403
-
     if tabela not in SAFE_TABLES:
         return jsonify({"erro": "tabela inválida"}), 400
-
     return jsonify({"dados": listar(tabela)})
 
 
@@ -1897,27 +1445,9 @@ def api_create(tabela):
 
     try:
         if tabela == "pedidos":
-            inserir(
-                "pedidos",
-                "nome, cliente, valor",
-                (
-                    data.get("nome"),
-                    data.get("cliente"),
-                    float(data.get("valor", 0))
-                )
-            )
-
+            inserir("pedidos", "nome, cliente, valor", (data.get("nome"), data.get("cliente"), float(data.get("valor", 0))))
         elif tabela == "leads":
-            inserir(
-                "leads",
-                "nome, origem, temperatura",
-                (
-                    data.get("nome"),
-                    data.get("origem", "api"),
-                    data.get("temperatura", "frio")
-                )
-            )
-
+            inserir("leads", "nome, origem, temperatura", (data.get("nome"), data.get("origem", "api"), data.get("temperatura", "frio")))
         else:
             return jsonify({"erro": "criação permitida apenas para pedidos/leads"}), 400
 
@@ -1985,29 +1515,12 @@ async def buscar_cmd(update, context):
 
 
 async def pedido_cmd(update, context):
-    inserir(
-        "pedidos",
-        "nome, cliente",
-        (
-            context.args[0] if context.args else "",
-            " ".join(context.args[1:])
-        )
-    )
-
+    inserir("pedidos", "nome, cliente", (context.args[0] if context.args else "", " ".join(context.args[1:])))
     await send(update, "📦 Pedido criado.")
 
 
 async def lead_cmd(update, context):
-    inserir(
-        "leads",
-        "nome, origem, temperatura",
-        (
-            context.args[0] if context.args else "",
-            " ".join(context.args[1:]) or "telegram",
-            "morno"
-        )
-    )
-
+    inserir("leads", "nome, origem, temperatura", (context.args[0] if context.args else "", " ".join(context.args[1:]) or "telegram", "morno"))
     await send(update, "🎯 Lead criado.")
 
 
@@ -2016,47 +1529,24 @@ async def proposta_cmd(update, context):
     descricao = " ".join(context.args[1:]) or "pedido"
     texto = gerar_proposta(cliente, descricao)
 
-    inserir(
-        "propostas",
-        "cliente, descricao, valor, texto",
-        (
-            cliente,
-            descricao,
-            valor_orcamento(descricao),
-            texto
-        )
-    )
-
+    inserir("propostas", "cliente, descricao, valor, texto", (cliente, descricao, valor_orcamento(descricao), texto))
     await send(update, texto)
 
 
 async def receita_cmd(update, context):
     valor = float(context.args[0].replace(",", "."))
-
-    inserir(
-        "financeiro",
-        "tipo, valor, descricao",
-        ("receita", valor, "telegram")
-    )
-
+    inserir("financeiro", "tipo, valor, descricao", ("receita", valor, "telegram"))
     await send(update, f"💰 Receita R$ {valor:.2f}")
 
 
 async def despesa_cmd(update, context):
     valor = float(context.args[0].replace(",", "."))
-
-    inserir(
-        "financeiro",
-        "tipo, valor, descricao",
-        ("despesa", valor, "telegram")
-    )
-
+    inserir("financeiro", "tipo, valor, descricao", ("despesa", valor, "telegram"))
     await send(update, f"💸 Despesa R$ {valor:.2f}")
 
 
 async def financeiro_cmd(update, context):
     receita, despesa, lucro = financeiro()
-
     await send(update, f"""
 💵 FINANCEIRO
 
@@ -2076,24 +1566,8 @@ async def receber_documento(update, context):
 
     texto = extrair_arquivo(path)
 
-    inserir(
-        "uploads",
-        "nome, tipo, texto",
-        (
-            nome,
-            nome.split(".")[-1].lower(),
-            texto[:12000]
-        )
-    )
-
-    inserir(
-        "conhecimento",
-        "titulo, texto",
-        (
-            f"Telegram upload: {nome}",
-            texto[:12000]
-        )
-    )
+    inserir("uploads", "nome, tipo, texto", (nome, nome.split(".")[-1].lower(), texto[:12000]))
+    inserir("conhecimento", "titulo, texto", (f"Telegram upload: {nome}", texto[:12000]))
 
     await send(update, f"✅ Arquivo salvo e lido: {nome}\n\nPrévia:\n{texto[:1000]}")
 
@@ -2139,7 +1613,7 @@ async def telegram_main():
     await telegram_app.start()
 
     if WEBHOOK_URL:
-        await telegram_app.bot.set_webhook(f"{WEBHOOK_URL.rstrip()}/telegram-webhook")
+        await telegram_app.bot.set_webhook(f"{WEBHOOK_URL.rstrip('/')}/telegram-webhook")
         print("✅ Telegram WEBHOOK ativo V35")
     else:
         await telegram_app.updater.start_polling()
@@ -2160,7 +1634,4 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 threading.Thread(target=run_telegram, daemon=True).start()
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 8080))
-    )
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
