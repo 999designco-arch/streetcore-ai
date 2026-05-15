@@ -1,11 +1,14 @@
-import os, json, urllib.parse, traceback
+import os, json, urllib.parse, traceback, threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from flask import Flask, jsonify, render_template_string
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from groq import Groq
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+PORT = int(os.getenv("PORT", 8080))
+
 client = Groq(api_key=GROQ_API_KEY)
 TZ = ZoneInfo("America/Sao_Paulo")
 
@@ -23,24 +26,23 @@ MASTER_PROMPT = """
 Você é StreetCore AI MASTER ULTRA.
 Responda sempre em português.
 Use apenas ferramentas gratuitas ou plano grátis.
-Aja como CEO, COO, estrategista, diretor criativo, growth hacker, programador,
-vendedor, social media, engenheiro de automação, designer, roteirista e assistente pessoal.
-Explique passo a passo, como se estivesse pegando na mão do usuário.
-Seja prático, premium, claro, seguro e orientado à execução.
+Aja como CEO, estrategista, diretor criativo, programador, vendedor,
+engenheiro de automação, social media, designer, roteirista e assistente pessoal.
+Explique passo a passo como se estivesse pegando na mão do usuário.
 Peça aprovação antes de ações sensíveis.
 """
 
 AGENTS = {
-    "ceo": "CEO Agent: estratégia, monetização, prioridade, escala e decisão.",
-    "branding": "Branding Agent: identidade, posicionamento, estética, tom de voz e marca.",
-    "conteudo": "Content Agent: conteúdo viral, Reels, TikTok, Instagram e calendário.",
-    "vendas": "Sales Agent: oferta, copy, funil, WhatsApp, objeções e conversão.",
-    "dev": "Dev Agent: código, sites, apps, APIs, banco, debug e deploy grátis.",
-    "automacao": "Automation Agent: automações gratuitas, fluxos, n8n, scripts e produtividade.",
-    "visual": "Visual Agent: imagens, logos, thumbnails, banners e direção de arte.",
-    "video": "Video Agent: roteiros, cenas, anúncios, Shorts e prompts cinematográficos.",
-    "docs": "Docs Agent: documentos, propostas, briefings, contratos simples e planos.",
-    "assistente": "Personal Assistant Agent: agenda, lembretes, rotina, hábitos e foco."
+    "ceo": "CEO Agent: estratégia, monetização e escala.",
+    "branding": "Branding Agent: marca, identidade e estética.",
+    "conteudo": "Content Agent: conteúdo viral e redes sociais.",
+    "vendas": "Sales Agent: oferta, copy, funil e conversão.",
+    "dev": "Dev Agent: código, apps, APIs, deploy e sistemas.",
+    "automacao": "Automation Agent: automações gratuitas e produtividade.",
+    "visual": "Visual Agent: imagens, logos, thumbnails e direção de arte.",
+    "video": "Video Agent: roteiros, cenas, Shorts, anúncios e prompts.",
+    "docs": "Docs Agent: documentos, propostas, briefings e planos.",
+    "assistente": "Assistant Agent: agenda, lembretes, hábitos e rotina."
 }
 
 SENSITIVE = ["enviar", "publicar", "publique", "postar agora", "apagar", "deletar", "excluir", "comprar", "pagar", "contratar", "cancelar", "mandar mensagem", "enviar email", "remover"]
@@ -68,23 +70,29 @@ def memory():
 def save_memory(mem):
     save_json(FILES["memory"], mem)
 
-def is_owner(update):
-    config = load_json(FILES["config"], {})
-    owner = config.get("owner_id")
-    if not owner:
-        return True
-    return update.effective_user.id == owner
-
-async def guard(update):
-    if not is_owner(update):
-        await update.message.reply_text("🔒 Acesso negado. Este agente já possui dono.")
-        return False
-    return True
-
 def save_item(tipo, tema, conteudo):
-    data = load_json(FILES["items"], [])
-    data.append({"tipo": tipo, "tema": tema, "conteudo": conteudo, "data": str(datetime.now(TZ))})
-    save_json(FILES["items"], data)
+    items = load_json(FILES["items"], [])
+    items.append({
+        "tipo": tipo,
+        "tema": tema,
+        "conteudo": conteudo,
+        "data": str(datetime.now(TZ))
+    })
+    save_json(FILES["items"], items)
+
+def sensitive(text):
+    return any(w in text.lower() for w in SENSITIVE)
+
+def create_approval(acao, origem):
+    data = load_json(FILES["approvals"], [])
+    data.append({
+        "acao": acao,
+        "origem": origem,
+        "status": "pendente",
+        "data": str(datetime.now(TZ))
+    })
+    save_json(FILES["approvals"], data)
+    return len(data)
 
 def ask_ai(prompt, agent=None):
     mem = json.dumps(memory(), ensure_ascii=False, indent=2)
@@ -100,10 +108,8 @@ def ask_ai(prompt, agent=None):
     return r.choices[0].message.content
 
 async def send_long(update, text):
-    if not text:
-        text = "Sem resposta."
-    for i in range(0, len(text), 3900):
-        await update.message.reply_text(text[i:i+3900])
+    for i in range(0, len(text or "Sem resposta.", 3900)):
+        await update.message.reply_text((text or "Sem resposta.")[i:i+3900])
 
 def auto_memory(msg):
     mem = memory()
@@ -124,21 +130,10 @@ def auto_memory(msg):
     mem["ultima_interacao"] = str(datetime.now(TZ))
     save_memory(mem)
 
-def sensitive(text):
-    return any(w in text.lower() for w in SENSITIVE)
-
-def approval(acao, origem):
-    data = load_json(FILES["approvals"], [])
-    data.append({"acao": acao, "origem": origem, "status": "pendente", "data": str(datetime.now(TZ))})
-    save_json(FILES["approvals"], data)
-    return len(data)
-
 def img_url(prompt, w=1024, h=1024, seed=77):
-    p = urllib.parse.quote(prompt)
-    return f"https://image.pollinations.ai/prompt/{p}?width={w}&height={h}&seed={seed}"
+    return f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width={w}&height={h}&seed={seed}"
 
 def img_prompt(tipo, tema):
-    base = f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, dramatic lighting, 8k, highly detailed. Theme: {tema}"
     if tipo == "logo":
         return f"minimal futuristic luxury logo, clean vector, white background, premium streetwear branding. Brand: {tema}"
     if tipo == "thumbnail":
@@ -147,108 +142,99 @@ def img_prompt(tipo, tema):
         return f"wide premium cinematic banner, futuristic luxury brand campaign, clean space for headline. Theme: {tema}"
     if tipo == "poster":
         return f"cinematic poster, premium futuristic street luxury, neon, dramatic advertising composition. Theme: {tema}"
-    return base
+    return f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, dramatic lighting, 8k. Theme: {tema}"
 
 async def start(update, context):
-    config = load_json(FILES["config"], {})
-    if not config.get("owner_id"):
-        config["owner_id"] = update.effective_user.id
-        config["chat_id"] = update.effective_chat.id
-        save_json(FILES["config"], config)
-    await update.message.reply_text("🔥 StreetCore AI MASTER ULTRA online. Digite /menu.")
+    await update.message.reply_text("🔥 StreetCore AI com Dashboard Web online. Digite /menu.")
 
 async def menu(update, context):
     await update.message.reply_text("""
-🔥 STREETCORE AI MASTER ULTRA
+🔥 STREETCORE AI MASTER + DASHBOARD
 
-ESSENCIAL:
-/menu /status /memoria /backup /exportar
-
-MEMÓRIA:
+/menu /status /memoria
 /perfil nome = Rafael
 /objetivo criar empresa de IA
 /preferencia usar ferramentas grátis
 
-TAREFAS:
 /tarefa texto
 /tarefas
 /check
 /concluir 1
-/apagartarefa 1
 
-MULTIAGENTES:
 /agent objetivo
 /ceo /brandagent /contentagent /salesagent /devagent /autoagent /visualagent /videoagent /docsagent
 
-IMAGEM:
-/imagem /logo /thumbnail /poster /banner /promptimg
+/imagem tema
+/logo marca
+/thumbnail tema
+/poster tema
+/banner tema
+/promptimg tema
 
-VÍDEO:
-/video /roteiro /cenas /shorts /anuncio /promptvideo
+/video tema
+/roteiro tema
+/shorts tema
+/anuncio tema
+/promptvideo tema
 
-NEGÓCIOS:
-/roadmap /branding /conteudo /oferta /funil /saas /site /app /doc /proposta /briefing
+/roadmap tema
+/branding tema
+/conteudo tema
+/oferta tema
+/funil tema
+/saas tema
+/site tema
+/app tema
+/doc tema
+/proposta tema
+/briefing tema
 
-ASSISTENTE:
-/agenda /lembrete /lembretes /rotina /habito /dia
+/agenda texto
+/lembrete texto
+/dia
 
-AUTOMAÇÃO:
 /ativar
 /agendar 09:00 revisar tarefas
 /agendamentos
-/pausaragendamento 1
-/reativaragendamento 1
-/removeragendamento 1
 
-SEGURANÇA:
-/pendentesaprovacao
-/aprovar 1
-/rejeitar 1
-
-ARQUIVO INTERNO:
+/backup
+/exportar
 /listar
-/veritem 1
 /buscar palavra
-/historico
-/apagaritem 1
+/veritem 1
 """)
 
 async def status(update, context):
-    if not await guard(update): return
     mem = memory()
-    pend = [a for a in load_json(FILES["approvals"], []) if a.get("status") == "pendente"]
     await update.message.reply_text(f"""
-🚀 STATUS ULTRA
+🚀 STATUS
 
 Perfil: {len(mem["perfil"])}
 Objetivos: {len(mem["objetivos"])}
 Preferências: {len(mem["preferencias"])}
 Tarefas: {len(load_json(FILES["tasks"], []))}
 Itens salvos: {len(load_json(FILES["items"], []))}
-Agenda/Lembretes: {len(load_json(FILES["assistant"], []))}
+Lembretes/Agenda: {len(load_json(FILES["assistant"], []))}
 Agendamentos: {len(load_json(FILES["schedules"], []))}
-Aprovações pendentes: {len(pend)}
+Aprovações: {len(load_json(FILES["approvals"], []))}
 
-Sistema: ONLINE
-Modo: MASTER ULTRA
+Dashboard: ativo
 """)
 
 async def memoria(update, context):
-    if not await guard(update): return
     mem = memory()
     text = "🧠 MEMÓRIA\n\n👤 PERFIL:\n"
     for k, v in mem["perfil"].items():
         text += f"• {k}: {v}\n"
     text += "\n🎯 OBJETIVOS:\n"
-    for i, x in enumerate(mem["objetivos"], 1):
-        text += f"{i}. {x}\n"
+    for i, v in enumerate(mem["objetivos"], 1):
+        text += f"{i}. {v}\n"
     text += "\n⚙️ PREFERÊNCIAS:\n"
-    for i, x in enumerate(mem["preferencias"], 1):
-        text += f"{i}. {x}\n"
+    for i, v in enumerate(mem["preferencias"], 1):
+        text += f"{i}. {v}\n"
     await send_long(update, text)
 
 async def perfil(update, context):
-    if not await guard(update): return
     txt = " ".join(context.args)
     if "=" not in txt:
         await update.message.reply_text("Use: /perfil nome = Rafael")
@@ -260,7 +246,6 @@ async def perfil(update, context):
     await update.message.reply_text("✅ Perfil salvo.")
 
 async def objetivo(update, context):
-    if not await guard(update): return
     txt = " ".join(context.args)
     mem = memory()
     mem["objetivos"].append(txt)
@@ -268,7 +253,6 @@ async def objetivo(update, context):
     await update.message.reply_text("🎯 Objetivo salvo.")
 
 async def preferencia(update, context):
-    if not await guard(update): return
     txt = " ".join(context.args)
     mem = memory()
     mem["preferencias"].append(txt)
@@ -276,29 +260,20 @@ async def preferencia(update, context):
     await update.message.reply_text("⚙️ Preferência salva.")
 
 async def tarefa(update, context):
-    if not await guard(update): return
     txt = " ".join(context.args)
-    if not txt:
-        await update.message.reply_text("Use: /tarefa texto")
-        return
     tasks = load_json(FILES["tasks"], [])
     tasks.append({"tarefa": txt, "status": "pendente", "data": str(datetime.now(TZ))})
     save_json(FILES["tasks"], tasks)
     await update.message.reply_text("✅ Tarefa criada.")
 
 async def tarefas(update, context):
-    if not await guard(update): return
     tasks = load_json(FILES["tasks"], [])
-    if not tasks:
-        await update.message.reply_text("Nenhuma tarefa.")
-        return
     text = "📝 TAREFAS:\n\n"
     for i, t in enumerate(tasks, 1):
         text += f"{i}. {t['tarefa']} — {t['status']}\n"
-    await send_long(update, text)
+    await send_long(update, text if tasks else "Nenhuma tarefa.")
 
 async def check(update, context):
-    if not await guard(update): return
     tasks = load_json(FILES["tasks"], [])
     text = "⚠️ PENDENTES:\n\n"
     found = False
@@ -309,7 +284,6 @@ async def check(update, context):
     await send_long(update, text if found else "🔥 Nenhuma pendência.")
 
 async def concluir(update, context):
-    if not await guard(update): return
     try:
         n = int(context.args[0])
         tasks = load_json(FILES["tasks"], [])
@@ -319,19 +293,7 @@ async def concluir(update, context):
     except:
         await update.message.reply_text("Use: /concluir 1")
 
-async def apagartarefa(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        tasks = load_json(FILES["tasks"], [])
-        removed = tasks.pop(n-1)
-        save_json(FILES["tasks"], tasks)
-        await update.message.reply_text(f"🗑 Tarefa apagada: {removed['tarefa']}")
-    except:
-        await update.message.reply_text("Use: /apagartarefa 1")
-
 async def generic(update, context, tipo, prompt, agent=None):
-    if not await guard(update): return
     tema = " ".join(context.args)
     if not tema:
         await update.message.reply_text(f"Use: /{tipo} tema")
@@ -340,7 +302,7 @@ async def generic(update, context, tipo, prompt, agent=None):
     save_item(tipo, tema, resp)
     await send_long(update, resp)
 
-async def ceo(u,c): await generic(u,c,"ceo","Analise como CEO com estratégia, monetização, riscos e próximos passos.","ceo")
+async def ceo(u,c): await generic(u,c,"ceo","Analise como CEO com estratégia, monetização e próximos passos.","ceo")
 async def brandagent(u,c): await generic(u,c,"branding","Crie branding premium completo.","branding")
 async def contentagent(u,c): await generic(u,c,"conteudo","Crie estratégia de conteúdo viral.","conteudo")
 async def salesagent(u,c): await generic(u,c,"vendas","Crie oferta, copy, funil e plano de vendas.","vendas")
@@ -351,11 +313,7 @@ async def videoagent(u,c): await generic(u,c,"video","Crie estratégia de vídeo
 async def docsagent(u,c): await generic(u,c,"docs","Crie documento profissional completo.","docs")
 
 async def agent(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
-    if not tema:
-        await update.message.reply_text("Use: /agent objetivo")
-        return
     resp = ask_ai(f"""
 Resolva com todos os agentes:
 
@@ -378,54 +336,48 @@ Resolva com todos os agentes:
     await send_long(update, resp)
 
 async def imagem(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
     await update.message.reply_text("🎨 Gerando imagem grátis...")
     await update.message.reply_photo(photo=img_url(img_prompt("imagem", tema)))
 
 async def logo(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
     await update.message.reply_text("🔥 Criando logo grátis...")
     await update.message.reply_photo(photo=img_url(img_prompt("logo", tema), 1024, 1024, 88))
 
 async def thumbnail(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
     await update.message.reply_text("🧲 Criando thumbnail grátis...")
     await update.message.reply_photo(photo=img_url(img_prompt("thumbnail", tema), 1280, 720, 99))
 
 async def poster(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
     await update.message.reply_text("🎬 Criando poster grátis...")
     await update.message.reply_photo(photo=img_url(img_prompt("poster", tema), 1024, 1536, 111))
 
 async def banner(update, context):
-    if not await guard(update): return
     tema = " ".join(context.args)
     await update.message.reply_text("🖼 Criando banner grátis...")
     await update.message.reply_photo(photo=img_url(img_prompt("banner", tema), 1536, 768, 222))
 
-async def promptimg(u,c): await generic(u,c,"promptimg","Crie 5 prompts ultra avançados para imagem IA com versão em inglês.","visual")
+async def promptimg(u,c): await generic(u,c,"promptimg","Crie 5 prompts ultra avançados para imagem IA.","visual")
 async def video(u,c): await generic(u,c,"video","Crie conceito completo de vídeo cinematográfico.","video")
 async def roteiro(u,c): await generic(u,c,"roteiro","Crie roteiro completo com hook, cenas, narração e CTA.","video")
-async def cenas(u,c): await generic(u,c,"cenas","Crie lista de cenas cinematográficas com câmera, luz e prompts.","video")
-async def shorts(u,c): await generic(u,c,"shorts","Crie roteiro Shorts/Reels/TikTok com hook, cortes, narração e CTA.","video")
+async def shorts(u,c): await generic(u,c,"shorts","Crie roteiro Shorts/Reels/TikTok.","video")
 async def anuncio(u,c): await generic(u,c,"anuncio","Crie anúncio em vídeo com dor, promessa, oferta e CTA.","video")
 async def promptvideo(u,c): await generic(u,c,"promptvideo","Crie 5 prompts cinematográficos para vídeo IA em 9:16.","video")
 
 async def roadmap(u,c): await generic(u,c,"roadmap","Crie roadmap executivo com plano de 7 e 30 dias.","ceo")
-async def branding(u,c): await generic(u,c,"branding","Crie branding completo com paleta, tom, manifesto e posicionamento.","branding")
-async def conteudo(u,c): await generic(u,c,"conteudo","Crie conteúdo viral com legenda, CTA, hashtags e ideia visual.","conteudo")
-async def oferta(u,c): await generic(u,c,"oferta","Crie oferta irresistível com copy e CTA.","vendas")
-async def funil(u,c): await generic(u,c,"funil","Crie funil de vendas usando ferramentas grátis.","vendas")
-async def saas(u,c): await generic(u,c,"saas","Crie arquitetura SaaS com MVP, stack grátis e monetização.","dev")
+async def branding(u,c): await generic(u,c,"branding","Crie branding completo.","branding")
+async def conteudo(u,c): await generic(u,c,"conteudo","Crie conteúdo viral.","conteudo")
+async def oferta(u,c): await generic(u,c,"oferta","Crie oferta irresistível.","vendas")
+async def funil(u,c): await generic(u,c,"funil","Crie funil de vendas gratuito.","vendas")
+async def saas(u,c): await generic(u,c,"saas","Crie arquitetura SaaS com MVP e stack grátis.","dev")
 async def site(u,c): await generic(u,c,"site","Crie site com HTML/CSS e deploy grátis.","dev")
-async def app_cmd(u,c): await generic(u,c,"app","Crie app simples com MVP, telas e stack grátis.","dev")
-async def doc(u,c): await generic(u,c,"doc","Crie documento profissional completo.","docs")
-async def proposta(u,c): await generic(u,c,"proposta","Crie proposta comercial profissional.","docs")
-async def briefing(u,c): await generic(u,c,"briefing","Crie briefing profissional completo.","docs")
+async def app_cmd(u,c): await generic(u,c,"app","Crie app simples com MVP e stack grátis.","dev")
+async def doc(u,c): await generic(u,c,"doc","Crie documento profissional.","docs")
+async def proposta(u,c): await generic(u,c,"proposta","Crie proposta comercial.","docs")
+async def briefing(u,c): await generic(u,c,"briefing","Crie briefing profissional.","docs")
 
 def save_assistant(tipo, conteudo):
     data = load_json(FILES["assistant"], [])
@@ -433,44 +385,24 @@ def save_assistant(tipo, conteudo):
     save_json(FILES["assistant"], data)
 
 async def agenda(update, context):
-    if not await guard(update): return
     save_assistant("agenda", " ".join(context.args))
     await update.message.reply_text("📅 Agenda salva.")
 
 async def lembrete(update, context):
-    if not await guard(update): return
     save_assistant("lembrete", " ".join(context.args))
     await update.message.reply_text("🔔 Lembrete salvo.")
 
-async def lembretes(update, context):
-    if not await guard(update): return
-    data = load_json(FILES["assistant"], [])
-    text = "🔔 ASSISTENTE:\n\n"
-    for i, x in enumerate(data, 1):
-        text += f"{i}. {x['tipo']}: {x['conteudo']}\n"
-    await send_long(update, text)
-
-async def rotina(u,c): await generic(u,c,"rotina","Crie rotina diária prática e inteligente.","assistente")
-
-async def habito(update, context):
-    if not await guard(update): return
-    save_assistant("habito", " ".join(context.args))
-    await update.message.reply_text("✅ Hábito salvo.")
-
 async def dia(update, context):
-    if not await guard(update): return
     resp = ask_ai(f"Monte meu plano de hoje com tarefas {load_json(FILES['tasks'], [])} e agenda {load_json(FILES['assistant'], [])}", "assistente")
     await send_long(update, resp)
 
 async def ativar(update, context):
     config = load_json(FILES["config"], {})
     config["chat_id"] = update.effective_chat.id
-    config.setdefault("owner_id", update.effective_user.id)
     save_json(FILES["config"], config)
     await update.message.reply_text("✅ Execução automática ativada.")
 
 async def agendar(update, context):
-    if not await guard(update): return
     txt = " ".join(context.args)
     try:
         hora, acao = txt.split(" ", 1)
@@ -483,90 +415,19 @@ async def agendar(update, context):
         await update.message.reply_text("Use: /agendar 09:00 revisar tarefas")
 
 async def agendamentos(update, context):
-    if not await guard(update): return
     data = load_json(FILES["schedules"], [])
     text = "⏰ AGENDAMENTOS:\n\n"
     for i, s in enumerate(data, 1):
-        st = "ativo" if s.get("ativo") else "pausado"
-        text += f"{i}. {s['hora']} — {s['acao']} — {st}\n"
-    await send_long(update, text)
-
-async def pausaragendamento(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        data = load_json(FILES["schedules"], [])
-        data[n-1]["ativo"] = False
-        save_json(FILES["schedules"], data)
-        await update.message.reply_text("⏸ Agendamento pausado.")
-    except:
-        await update.message.reply_text("Use: /pausaragendamento 1")
-
-async def reativaragendamento(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        data = load_json(FILES["schedules"], [])
-        data[n-1]["ativo"] = True
-        save_json(FILES["schedules"], data)
-        await update.message.reply_text("▶️ Agendamento reativado.")
-    except:
-        await update.message.reply_text("Use: /reativaragendamento 1")
-
-async def removeragendamento(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        data = load_json(FILES["schedules"], [])
-        data.pop(n-1)
-        save_json(FILES["schedules"], data)
-        await update.message.reply_text("🗑 Agendamento removido.")
-    except:
-        await update.message.reply_text("Use: /removeragendamento 1")
-
-async def pendentesaprovacao(update, context):
-    if not await guard(update): return
-    data = load_json(FILES["approvals"], [])
-    text = "🛡 APROVAÇÕES PENDENTES:\n\n"
-    found = False
-    for i, a in enumerate(data, 1):
-        if a.get("status") == "pendente":
-            found = True
-            text += f"{i}. {a['acao']}\n"
-    await send_long(update, text if found else "Nenhuma aprovação pendente.")
-
-async def aprovar(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        data = load_json(FILES["approvals"], [])
-        data[n-1]["status"] = "aprovado"
-        save_json(FILES["approvals"], data)
-        resp = ask_ai(f"Ação aprovada: {data[n-1]['acao']}. Entregue execução segura passo a passo.", "assistente")
-        await send_long(update, resp)
-    except:
-        await update.message.reply_text("Use: /aprovar 1")
-
-async def rejeitar(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        data = load_json(FILES["approvals"], [])
-        data[n-1]["status"] = "rejeitado"
-        save_json(FILES["approvals"], data)
-        await update.message.reply_text("❌ Rejeitado.")
-    except:
-        await update.message.reply_text("Use: /rejeitar 1")
+        text += f"{i}. {s['hora']} — {s['acao']} — {'ativo' if s.get('ativo') else 'pausado'}\n"
+    await send_long(update, text if data else "Nenhum agendamento.")
 
 async def backup(update, context):
-    if not await guard(update): return
     data = {k: load_json(v, {}) for k,v in FILES.items()}
     with open("backup_streetcore.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     await update.message.reply_document(document=open("backup_streetcore.json", "rb"))
 
 async def exportar(update, context):
-    if not await guard(update): return
     items = load_json(FILES["items"], [])
     text = "EXPORTAÇÃO STREETCORE\n\n"
     for i, item in enumerate(items, 1):
@@ -576,47 +437,30 @@ async def exportar(update, context):
     await update.message.reply_document(document=open("exportacao_streetcore.txt", "rb"))
 
 async def listar(update, context):
-    if not await guard(update): return
     items = load_json(FILES["items"], [])
     text = "📚 ITENS:\n\n"
     for i, item in enumerate(items, 1):
         text += f"{i}. [{item['tipo']}] {item['tema']}\n"
     await send_long(update, text if items else "Nada salvo.")
 
+async def buscar(update, context):
+    q = " ".join(context.args).lower()
+    items = load_json(FILES["items"], [])
+    text = f"🔎 BUSCA: {q}\n\n"
+    found = False
+    for i, item in enumerate(items, 1):
+        if q in json.dumps(item, ensure_ascii=False).lower():
+            found = True
+            text += f"{i}. [{item['tipo']}] {item['tema']}\n"
+    await send_long(update, text if found else "Nada encontrado.")
+
 async def veritem(update, context):
-    if not await guard(update): return
     try:
         n = int(context.args[0])
         item = load_json(FILES["items"], [])[n-1]
         await send_long(update, f"📌 {item['tipo']} — {item['tema']}\n\n{item['conteudo']}")
     except:
         await update.message.reply_text("Use: /veritem 1")
-
-async def buscar(update, context):
-    if not await guard(update): return
-    q = " ".join(context.args).lower()
-    items = load_json(FILES["items"], [])
-    text = f"🔎 BUSCA: {q}\n\n"
-    found = False
-    for i, item in enumerate(items, 1):
-        blob = json.dumps(item, ensure_ascii=False).lower()
-        if q in blob:
-            found = True
-            text += f"{i}. [{item['tipo']}] {item['tema']}\n"
-    await send_long(update, text if found else "Nada encontrado.")
-
-async def historico(update, context): await listar(update, context)
-
-async def apagaritem(update, context):
-    if not await guard(update): return
-    try:
-        n = int(context.args[0])
-        items = load_json(FILES["items"], [])
-        removed = items.pop(n-1)
-        save_json(FILES["items"], items)
-        await update.message.reply_text(f"🗑 Item apagado: {removed['tema']}")
-    except:
-        await update.message.reply_text("Use: /apagaritem 1")
 
 async def scheduled_checker(context):
     config = load_json(FILES["config"], {})
@@ -629,12 +473,10 @@ async def scheduled_checker(context):
     data = load_json(FILES["schedules"], [])
     changed = False
     for s in data:
-        if not s.get("ativo", True):
-            continue
-        if s.get("hora") == cur and s.get("ultimo_disparo") != today:
+        if s.get("ativo") and s.get("hora") == cur and s.get("ultimo_disparo") != today:
             acao = s.get("acao", "")
             if sensitive(acao):
-                idx = approval(acao, "agendamento")
+                idx = create_approval(acao, "agendamento")
                 await context.bot.send_message(chat_id=chat, text=f"🛡 Aprovação necessária #{idx}: {acao}")
             else:
                 resp = ask_ai(f"Execute este agendamento: {acao}", "assistente")
@@ -647,65 +489,131 @@ async def scheduled_checker(context):
         save_json(FILES["schedules"], data)
 
 async def handle_message(update, context):
-    if not await guard(update): return
     msg = update.message.text
     auto_memory(msg)
+
     if sensitive(msg):
-        idx = approval(msg, "mensagem")
-        await update.message.reply_text(f"🛡 Ação sensível. Aprovação criada #{idx}. Use /aprovar {idx} ou /rejeitar {idx}.")
+        idx = create_approval(msg, "mensagem")
+        await update.message.reply_text(f"🛡 Ação sensível. Aprovação criada #{idx}.")
         return
 
     low = msg.lower()
-    if low.startswith("crie uma tarefa") or low.startswith("tarefa "):
-        tasks = load_json(FILES["tasks"], [])
-        tasks.append({"tarefa": msg, "status": "pendente", "data": str(datetime.now(TZ))})
-        save_json(FILES["tasks"], tasks)
-        await update.message.reply_text("✅ Tarefa criada por linguagem natural.")
-        return
-
     if "plano para hoje" in low or "planeje meu dia" in low:
         resp = ask_ai(f"Monte meu plano de hoje com tarefas {load_json(FILES['tasks'], [])}", "assistente")
         await send_long(update, resp)
         return
 
-    if "crie imagem" in low or "gerar imagem" in low:
-        await update.message.reply_photo(photo=img_url(img_prompt("imagem", msg)))
-        return
-
     resp = ask_ai(msg)
     await send_long(update, resp)
 
-async def error_handler(update, context):
-    err = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-    print(err)
-    if update and update.effective_message:
-        await update.effective_message.reply_text("⚠️ Erro interno capturado. Me mande print dos logs se persistir.")
+# DASHBOARD WEB
 
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+web = Flask(__name__)
+
+HTML = """
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>StreetCore AI Dashboard</title>
+<style>
+body{margin:0;background:#07070a;color:#f5f5f5;font-family:Arial}
+header{padding:28px;background:linear-gradient(135deg,#111,#2b0055);border-bottom:1px solid #333}
+h1{margin:0;font-size:32px}
+p{color:#bbb}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:20px}
+.card{background:#111;border:1px solid #292929;border-radius:18px;padding:18px;box-shadow:0 0 25px rgba(130,0,255,.12)}
+.card h2{margin-top:0;color:#b56cff}
+pre{white-space:pre-wrap;background:#080808;border-radius:12px;padding:12px;max-height:320px;overflow:auto}
+.badge{font-size:34px;font-weight:bold}
+</style>
+</head>
+<body>
+<header>
+<h1>🔥 StreetCore AI Dashboard</h1>
+<p>Painel visual gratuito do seu agente IA.</p>
+</header>
+<div class="grid">
+<div class="card"><h2>Memória</h2><div class="badge">{{memory_count}}</div></div>
+<div class="card"><h2>Tarefas</h2><div class="badge">{{tasks_count}}</div></div>
+<div class="card"><h2>Itens Salvos</h2><div class="badge">{{items_count}}</div></div>
+<div class="card"><h2>Agenda</h2><div class="badge">{{assistant_count}}</div></div>
+<div class="card"><h2>Agendamentos</h2><div class="badge">{{schedules_count}}</div></div>
+<div class="card"><h2>Aprovações</h2><div class="badge">{{approvals_count}}</div></div>
+</div>
+<div class="grid">
+<div class="card"><h2>Memória</h2><pre>{{memory}}</pre></div>
+<div class="card"><h2>Tarefas</h2><pre>{{tasks}}</pre></div>
+<div class="card"><h2>Últimos Itens</h2><pre>{{items}}</pre></div>
+<div class="card"><h2>Agenda/Lembretes</h2><pre>{{assistant}}</pre></div>
+</div>
+</body>
+</html>
+"""
+
+@web.route("/")
+def dashboard():
+    mem = memory()
+    tasks = load_json(FILES["tasks"], [])
+    items = load_json(FILES["items"], [])
+    assistant = load_json(FILES["assistant"], [])
+    schedules = load_json(FILES["schedules"], [])
+    approvals = load_json(FILES["approvals"], [])
+
+    return render_template_string(
+        HTML,
+        memory_count=len(mem.get("perfil", {})) + len(mem.get("objetivos", [])) + len(mem.get("preferencias", [])),
+        tasks_count=len(tasks),
+        items_count=len(items),
+        assistant_count=len(assistant),
+        schedules_count=len(schedules),
+        approvals_count=len(approvals),
+        memory=json.dumps(mem, ensure_ascii=False, indent=2),
+        tasks=json.dumps(tasks[-10:], ensure_ascii=False, indent=2),
+        items=json.dumps(items[-10:], ensure_ascii=False, indent=2),
+        assistant=json.dumps(assistant[-10:], ensure_ascii=False, indent=2)
+    )
+
+@web.route("/api/status")
+def api_status():
+    return jsonify({
+        "memory": memory(),
+        "tasks": load_json(FILES["tasks"], []),
+        "items": load_json(FILES["items"], []),
+        "assistant": load_json(FILES["assistant"], []),
+        "schedules": load_json(FILES["schedules"], []),
+        "approvals": load_json(FILES["approvals"], [])
+    })
+
+def run_web():
+    web.run(host="0.0.0.0", port=PORT)
+
+tg = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 commands = {
     "start": start, "menu": menu, "status": status, "memoria": memoria,
     "perfil": perfil, "objetivo": objetivo, "preferencia": preferencia,
-    "tarefa": tarefa, "tarefas": tarefas, "check": check, "concluir": concluir, "apagartarefa": apagartarefa,
-    "ceo": ceo, "brandagent": brandagent, "contentagent": contentagent, "salesagent": salesagent, "devagent": devagent,
-    "autoagent": autoagent, "visualagent": visualagent, "videoagent": videoagent, "docsagent": docsagent, "agent": agent,
+    "tarefa": tarefa, "tarefas": tarefas, "check": check, "concluir": concluir,
+    "ceo": ceo, "brandagent": brandagent, "contentagent": contentagent,
+    "salesagent": salesagent, "devagent": devagent, "autoagent": autoagent,
+    "visualagent": visualagent, "videoagent": videoagent, "docsagent": docsagent,
+    "agent": agent,
     "imagem": imagem, "logo": logo, "thumbnail": thumbnail, "poster": poster, "banner": banner, "promptimg": promptimg,
-    "video": video, "roteiro": roteiro, "cenas": cenas, "shorts": shorts, "anuncio": anuncio, "promptvideo": promptvideo,
-    "roadmap": roadmap, "branding": branding, "conteudo": conteudo, "oferta": oferta, "funil": funil, "saas": saas, "site": site, "app": app_cmd,
-    "doc": doc, "proposta": proposta, "briefing": briefing,
-    "agenda": agenda, "lembrete": lembrete, "lembretes": lembretes, "rotina": rotina, "habito": habito, "dia": dia,
+    "video": video, "roteiro": roteiro, "shorts": shorts, "anuncio": anuncio, "promptvideo": promptvideo,
+    "roadmap": roadmap, "branding": branding, "conteudo": conteudo, "oferta": oferta, "funil": funil,
+    "saas": saas, "site": site, "app": app_cmd, "doc": doc, "proposta": proposta, "briefing": briefing,
+    "agenda": agenda, "lembrete": lembrete, "dia": dia,
     "ativar": ativar, "agendar": agendar, "agendamentos": agendamentos,
-    "pausaragendamento": pausaragendamento, "reativaragendamento": reativaragendamento, "removeragendamento": removeragendamento,
-    "pendentesaprovacao": pendentesaprovacao, "aprovar": aprovar, "rejeitar": rejeitar,
-    "backup": backup, "exportar": exportar, "listar": listar, "veritem": veritem, "buscar": buscar, "historico": historico, "apagaritem": apagaritem
+    "backup": backup, "exportar": exportar, "listar": listar, "buscar": buscar, "veritem": veritem
 }
 
 for name, func in commands.items():
-    app.add_handler(CommandHandler(name, func))
+    tg.add_handler(CommandHandler(name, func))
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.add_error_handler(error_handler)
-app.job_queue.run_repeating(scheduled_checker, interval=60, first=10)
+tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+tg.job_queue.run_repeating(scheduled_checker, interval=60, first=10)
 
-print("🔥 STREETCORE AI MASTER ULTRA FINAL ONLINE")
-app.run_polling()
+threading.Thread(target=run_web, daemon=True).start()
+
+print("🔥 STREETCORE AI + WEB DASHBOARD ONLINE")
+tg.run_polling()
