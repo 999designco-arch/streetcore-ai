@@ -332,7 +332,7 @@ def iniciar_banco():
                 (nome, funcao, "Aguardando primeira execução.")
             )
 
-    print("✅ StreetCore OS V37 SINGULARITY CORE iniciado.")
+    print("✅ StreetCore OS V38 MASTER ADVANCED CORE iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -367,6 +367,23 @@ def login_required():
 
 def is_admin():
     return session.get("nivel") == "admin"
+
+def numero_float(valor, padrao=0):
+    try:
+        if valor is None or str(valor).strip() == "":
+            return padrao
+        return float(str(valor).replace(",", "."))
+    except Exception:
+        return padrao
+
+
+def numero_int(valor, padrao=0):
+    try:
+        if valor is None or str(valor).strip() == "":
+            return padrao
+        return int(float(str(valor).replace(",", ".")))
+    except Exception:
+        return padrao
 
 
 def limpar_nome(nome):
@@ -864,6 +881,9 @@ def layout(conteudo):
         ("Dashboard", "/"),
         ("Criar", "/criar"),
         ("Neural Center", "/neural"),
+        ("Master V38", "/master"),
+        ("Alertas", "/alertas"),
+        ("Follow-up", "/followup"),
         ("Singularity", "/singularity"),
         ("Workflow Vendas", "/workflow-vendas"),
         ("Funil", "/funil"),
@@ -908,7 +928,7 @@ def layout(conteudo):
     return f"""
 <html>
 <head>
-<title>StreetCore V37 Singularity Empire</title>
+<title>StreetCore V38 Singularity Empire</title>
 <style>
 body{{margin:0;background:#050505;color:#fff;font-family:Arial;}}
 .sidebar{{position:fixed;top:0;left:0;bottom:0;width:315px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto;}}
@@ -937,7 +957,7 @@ body{{background:white;color:black;}}
 </head>
 <body>
 <div class="sidebar">
-<h2>🔥 StreetCore V37</h2>
+<h2>🔥 StreetCore V38</h2>
 {links}
 <a href="/logout">Sair</a>
 </div>
@@ -974,7 +994,7 @@ def login():
     return f"""
 <body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#111;padding:40px;border-radius:20px;width:330px">
-<h1>🔥 StreetCore V37</h1>
+<h1>🔥 StreetCore V38</h1>
 {erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
@@ -1028,7 +1048,7 @@ def home():
     """
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V37 SINGULARITY CORE FREE</h1>
+    <h1>🔥 STREETCORE OS V38 MASTER ADVANCED CORE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
     <div class="grid">{cards}</div>
     {grafico}
@@ -1040,7 +1060,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "V37 SINGULARITY CORE FREE",
+        "version": "V38 MASTER ADVANCED CORE FREE",
         "webhook": bool(WEBHOOK_URL),
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
@@ -1660,7 +1680,7 @@ def restore():
 @app.route("/api/info")
 def api_info():
     return jsonify({
-        "version": "V37 SINGULARITY CORE FREE",
+        "version": "V38 MASTER ADVANCED CORE FREE",
         "api_key_header": "X-API-Key",
         "tables": SAFE_TABLES
     })
@@ -1724,7 +1744,7 @@ async def send(update, texto):
 
 async def start_cmd(update, context):
     await send(update,
-        "🔥 STREETCORE V37 SINGULARITY CORE\n\n"
+        "🔥 STREETCORE V38 MASTER ADVANCED CORE\n\n"
         "/neural vender mais hoje\n"
         "/agentes campanha de camisetas\n"
         "/relatorio\n"
@@ -1893,6 +1913,12 @@ async def telegram_main():
 
     for nome, funcao in comandos.items():
         telegram_app.add_handler(CommandHandler(nome, funcao))
+    for nome, funcao in {
+        "master": master_cmd,
+        "diagnostico": diagnostico_cmd,
+        "followup": followup_cmd
+    }.items():
+        telegram_app.add_handler(CommandHandler(nome, funcao))
 
     telegram_app.add_handler(MessageHandler(filters.VOICE, receber_voz))
     telegram_app.add_handler(MessageHandler(filters.Document.ALL, receber_documento))
@@ -1921,7 +1947,7 @@ def run_telegram():
 
 
 # =========================
-# V37 SINGULARITY CORE EXTRA
+# V38 MASTER ADVANCED CORE EXTRA
 # =========================
 
 def workflow_vendas(cliente, descricao):
@@ -2018,7 +2044,7 @@ def singularity_center():
         resposta = operador_total(comando)
 
     return layout(f"""
-    <h1>👑 V37 Singularity Center</h1>
+    <h1>👑 V38 Master Advanced Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2090,7 +2116,7 @@ def decisao_maxima():
     """)
 
 
-# Comandos extras V37 no Telegram
+# Comandos extras V38 no Telegram
 async def singularity_cmd(update, context):
     await send(update, operador_total(" ".join(context.args)))
 
@@ -2107,6 +2133,300 @@ async def workflow_cmd(update, context):
     cliente = context.args[0]
     descricao = " ".join(context.args[1:])
     await send(update, workflow_vendas(cliente, descricao))
+
+
+# =========================
+# V38 MASTER ADVANCED EXTRA
+# =========================
+
+def diagnostico_sistema():
+    receita, despesa, lucro = financeiro()
+    problemas = []
+
+    try:
+        estoque_baixo = sql("SELECT item, quantidade, minimo FROM estoque WHERE quantidade <= minimo LIMIT 20", fetch=True)
+    except Exception:
+        estoque_baixo = []
+
+    if estoque_baixo:
+        problemas.append("Estoque baixo: " + "; ".join([f"{x[0]} ({x[1]}/{x[2]})" for x in estoque_baixo]))
+
+    leads_quentes = sql("SELECT COUNT(*) FROM leads WHERE temperatura='quente'", fetch=True)[0][0]
+    propostas_abertas = contar("propostas")
+    tarefas_pendentes = sql("SELECT COUNT(*) FROM tarefas WHERE status='pendente'", fetch=True)[0][0]
+
+    return f"""🧠 DIAGNÓSTICO MASTER V38
+
+Receita: R$ {receita:.2f}
+Despesa: R$ {despesa:.2f}
+Lucro: R$ {lucro:.2f}
+
+Leads quentes: {leads_quentes}
+Propostas abertas: {propostas_abertas}
+Tarefas pendentes: {tarefas_pendentes}
+
+Alertas:
+{chr(10).join(problemas) if problemas else "Nenhum alerta crítico encontrado."}
+
+Próximas ações:
+✅ fazer follow-up dos leads quentes
+✅ revisar propostas abertas
+✅ criar campanha de vendas
+✅ verificar produção e estoque
+"""
+
+
+def plano_master_automatico():
+    diag = diagnostico_sistema()
+    acao = campanha("Street Graff personalizados")
+    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V38", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", ("Plano Master V38 criado automaticamente.", "nova"))
+    return f"""🚀 PLANO MASTER AUTOMÁTICO CRIADO
+
+{diag}
+
+Campanha preparada:
+
+{acao}
+"""
+
+
+def followup_leads():
+    leads = sql("SELECT id, nome, origem, temperatura FROM leads ORDER BY id DESC LIMIT 20", fetch=True)
+    if not leads:
+        return "Nenhum lead encontrado para follow-up."
+
+    linhas = []
+    for lead in leads:
+        lead_id, nome, origem, temp = lead
+        texto = f"Follow-up com {nome} ({temp}) vindo de {origem}"
+        inserir("tarefas", "titulo, status, prioridade", (texto, "pendente", "alta" if temp == "quente" else "normal"))
+        linhas.append(f"✅ {texto}")
+
+    return "📞 FOLLOW-UP CRIADO\n\n" + "\n".join(linhas)
+
+
+@app.route("/master", methods=["GET", "POST"])
+def master_center():
+    if not login_required():
+        return redirect("/login")
+
+    resposta = ""
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "diagnostico":
+            resposta = diagnostico_sistema()
+        elif acao == "plano":
+            resposta = plano_master_automatico()
+        elif acao == "followup":
+            resposta = followup_leads()
+        elif acao == "automacoes":
+            resposta = rodar_automacoes()
+        else:
+            resposta = conselho_multiagentes("Analise a operação inteira e gere o plano mais avançado possível.")
+
+    return layout(f"""
+    <h1>👑 V38 Master Advanced Center</h1>
+
+    <div class="card">
+        <form method="POST">
+            <select name="acao">
+                <option value="diagnostico">Diagnóstico completo</option>
+                <option value="plano">Criar plano master automático</option>
+                <option value="followup">Criar follow-up de leads</option>
+                <option value="automacoes">Rodar automações</option>
+                <option value="multiagentes">Conselho multiagentes</option>
+            </select>
+            <button>Executar</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <pre>{resposta}</pre>
+    </div>
+    """)
+
+
+@app.route("/alertas")
+def alertas_page():
+    if not login_required():
+        return redirect("/login")
+
+    return layout(f"""
+    <h1>🚨 Alertas Inteligentes</h1>
+    <div class="card">
+        <pre>{diagnostico_sistema()}</pre>
+    </div>
+    """)
+
+
+@app.route("/followup")
+def followup_page():
+    if not login_required():
+        return redirect("/login")
+
+    resultado = followup_leads()
+
+    return layout(f"""
+    <h1>📞 Follow-up Automático</h1>
+    <div class="card">
+        <pre>{resultado}</pre>
+    </div>
+    """)
+
+
+async def master_cmd(update, context):
+    await send(update, plano_master_automatico())
+
+
+async def diagnostico_cmd(update, context):
+    await send(update, diagnostico_sistema())
+
+
+async def followup_cmd(update, context):
+    await send(update, followup_leads())
+
+
+@app.route("/criar", methods=["GET", "POST"])
+def criar():
+    if not login_required():
+        return redirect("/login")
+
+    msg = ""
+
+    if request.method == "POST":
+        tipo = (request.form.get("tipo") or "").strip()
+        nome = (request.form.get("nome") or "").strip()
+        extra = (request.form.get("extra") or "").strip()
+        valor = (request.form.get("valor") or "").strip()
+
+        try:
+            if tipo == "pedido":
+                if not nome:
+                    msg = "Digite o nome do pedido."
+                else:
+                    inserir("pedidos", "nome, cliente, valor", (nome, extra, numero_float(valor, 0)))
+                    msg = "Pedido criado com sucesso."
+
+            elif tipo == "lead":
+                if not nome:
+                    msg = "Digite o nome do lead."
+                else:
+                    inserir("leads", "nome, origem, temperatura", (nome, extra or "painel", "morno"))
+                    msg = "Lead criado com sucesso."
+
+            elif tipo == "cliente":
+                if not nome:
+                    msg = "Digite o nome do cliente."
+                else:
+                    inserir("clientes", "nome, contato, historico", (nome, extra, "Criado no painel"))
+                    msg = "Cliente criado com sucesso."
+
+            elif tipo == "produto":
+                if not nome:
+                    msg = "Digite o nome do produto."
+                else:
+                    inserir("produtos", "nome, preco, descricao", (nome, numero_float(valor, 0), extra))
+                    msg = "Produto criado com sucesso."
+
+            elif tipo == "estoque":
+                if not nome:
+                    msg = "Digite o item do estoque."
+                else:
+                    inserir("estoque", "item, quantidade, minimo", (nome, numero_int(valor, 0), 5))
+                    msg = "Estoque criado com sucesso."
+
+            elif tipo == "producao":
+                if not nome:
+                    msg = "Digite o item da produção."
+                else:
+                    inserir("producao", "item, cliente, status", (nome, extra, "aguardando"))
+                    msg = "Produção criada com sucesso."
+
+            elif tipo == "tarefa":
+                if not nome:
+                    msg = "Digite a tarefa."
+                else:
+                    inserir("tarefas", "titulo, status, prioridade", (nome, "pendente", extra or "normal"))
+                    msg = "Tarefa criada com sucesso."
+
+            elif tipo == "receita":
+                inserir("financeiro", "tipo, valor, descricao", ("receita", numero_float(valor, 0), nome or "Receita pelo painel"))
+                msg = "Receita criada com sucesso."
+
+            elif tipo == "despesa":
+                inserir("financeiro", "tipo, valor, descricao", ("despesa", numero_float(valor, 0), nome or "Despesa pelo painel"))
+                msg = "Despesa criada com sucesso."
+
+            elif tipo == "fornecedor":
+                if not nome:
+                    msg = "Digite o nome do fornecedor."
+                else:
+                    inserir("fornecedores", "nome, contato", (nome, extra))
+                    msg = "Fornecedor criado com sucesso."
+
+            elif tipo == "meta":
+                if not nome:
+                    msg = "Digite a meta."
+                else:
+                    inserir("metas", "nome, valor, status", (nome, valor or extra, "ativa"))
+                    msg = "Meta criada com sucesso."
+
+            elif tipo == "notificacao":
+                if not nome:
+                    msg = "Digite a notificação."
+                else:
+                    inserir("notificacoes", "mensagem, status", (nome, "nova"))
+                    msg = "Notificação criada com sucesso."
+
+            else:
+                msg = "Escolha um tipo válido."
+
+        except Exception as e:
+            msg = f"Erro ao criar: {e}"
+
+        try:
+            log(f"Criar painel V38: {tipo} | {nome} | {msg}")
+        except Exception:
+            pass
+
+    return layout(f"""
+    <h1>➕ Criar Registro — V38 corrigido</h1>
+
+    <div class="card">
+        <p>{msg}</p>
+
+        <form method="POST">
+            <label>Tipo</label>
+            <select name="tipo">
+                <option value="pedido">Pedido</option>
+                <option value="lead">Lead</option>
+                <option value="cliente">Cliente</option>
+                <option value="produto">Produto</option>
+                <option value="estoque">Estoque</option>
+                <option value="producao">Produção</option>
+                <option value="tarefa">Tarefa</option>
+                <option value="receita">Receita</option>
+                <option value="despesa">Despesa</option>
+                <option value="fornecedor">Fornecedor</option>
+                <option value="meta">Meta</option>
+                <option value="notificacao">Notificação</option>
+            </select>
+
+            <label>Nome / descrição</label>
+            <input name="nome" placeholder="Ex: camiseta personalizada">
+
+            <label>Extra</label>
+            <input name="extra" placeholder="Cliente, origem, contato, prioridade ou descrição">
+
+            <label>Valor / quantidade</label>
+            <input name="valor" placeholder="Ex: 100 ou 10">
+
+            <button>Criar</button>
+        </form>
+    </div>
+    """)
 
 iniciar_banco()
 
