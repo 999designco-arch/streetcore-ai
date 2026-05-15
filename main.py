@@ -19,10 +19,42 @@ Você é StreetCore AI.
 Responda sempre em português.
 Use apenas ferramentas gratuitas ou plano grátis.
 Aja como CEO, COO, estrategista, diretor criativo, programador, vendedor, social media,
-engenheiro de automação e assistente pessoal.
+engenheiro de automação, arquiteto de SaaS e assistente pessoal.
 Explique passo a passo, como se estivesse pegando na mão do usuário.
 Seja prático, premium, claro e operacional.
 """
+
+AGENTS = {
+    "ceo": """
+Você é o CEO Agent.
+Pense como CEO estratégico.
+Foque em visão, prioridade, execução, dinheiro, escala, decisões e próximos passos.
+""",
+    "branding": """
+Você é o Branding Agent.
+Foque em identidade, posicionamento, estética, tom de voz, manifesto, marca e diferenciação.
+""",
+    "conteudo": """
+Você é o Content Agent.
+Foque em conteúdo viral, Reels, TikTok, Instagram, calendário, storytelling e crescimento orgânico.
+""",
+    "vendas": """
+Você é o Sales Agent.
+Foque em oferta, copy, funil, WhatsApp, objeções, fechamento, conversão e monetização.
+""",
+    "dev": """
+Você é o Dev Agent.
+Foque em programação, sites, apps, APIs, banco de dados, debug, arquitetura e deploy grátis.
+""",
+    "automacao": """
+Você é o Automation Agent.
+Foque em automações gratuitas, n8n, fluxos, scripts, processos, produtividade e sistemas.
+""",
+    "assistente": """
+Você é o Personal Assistant Agent.
+Foque em agenda, rotina, hábitos, foco, tarefas, lembretes e organização diária.
+"""
+}
 
 def load_json(file, default):
     if not os.path.exists(file):
@@ -59,12 +91,16 @@ def auto_memory(msg):
     mem["ultima_interacao"] = str(datetime.now())
     save_json(FILES["memory"], mem)
 
-def ask_ai(prompt):
+def ask_ai(prompt, agent=None):
     mem = json.dumps(memory(), ensure_ascii=False, indent=2)
+    agent_prompt = AGENTS.get(agent, "")
     r = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
-            {"role": "system", "content": MASTER_PROMPT + f"\n\nMEMÓRIA:\n{mem}"},
+            {
+                "role": "system",
+                "content": MASTER_PROMPT + "\n\n" + agent_prompt + f"\n\nMEMÓRIA:\n{mem}"
+            },
             {"role": "user", "content": prompt}
         ],
         temperature=0.8,
@@ -77,22 +113,25 @@ async def send_long(update, text):
         await update.message.reply_text(text[i:i+3900])
 
 def image_url(prompt):
-    p = urllib.parse.quote(f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, 8k. {prompt}")
+    p = urllib.parse.quote(
+        f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, 8k. {prompt}"
+    )
     return f"https://image.pollinations.ai/prompt/{p}?width=1024&height=1024&seed=77"
+
+async def start(update, context):
+    await update.message.reply_text("🔥 StreetCore AI online. Digite /menu para ver os comandos.")
 
 async def menu(update, context):
     await update.message.reply_text("""
 🔥 STREETCORE AI — CENTRAL DE COMANDOS
 
 ESSENCIAL:
-/start — iniciar o agente
-/status — ver status
-/menu — abrir este menu
-/ajuda — explicar como usar
-/comandos — lista completa
-
-MEMÓRIA:
-/memoria — ver memórias
+/start
+/status
+/menu
+/ajuda
+/comandos
+/memoria
 
 TAREFAS:
 /tarefa criar algo
@@ -102,9 +141,9 @@ TAREFAS:
 
 IMAGEM:
 /imagem descrição
-/logo nome da marca
+/logo nome
 
-CEO / NEGÓCIOS:
+OPERAÇÃO:
 /roadmap objetivo
 /automacao objetivo
 /conteudo tema
@@ -114,7 +153,7 @@ CEO / NEGÓCIOS:
 /site ideia
 /doc tema
 
-ASSISTENTE PESSOAL:
+ASSISTENTE:
 /agenda compromisso
 /lembrete algo
 /lembretes
@@ -123,88 +162,47 @@ ASSISTENTE PESSOAL:
 /habitos
 /dia
 
-Exemplo:
-/roadmap criar uma marca streetwear futurista
+MULTIAGENTES:
+/ceo objetivo
+/brandagent marca
+/contentagent tema
+/salesagent produto
+/devagent projeto
+/autoagent automação
+/agent problema complexo
 """)
 
 async def ajuda(update, context):
     await update.message.reply_text("""
-🧠 COMO USAR O STREETCORE AI
+🧠 COMO USAR
 
-Você pode falar normalmente comigo ou usar comandos.
+Você pode falar normalmente ou usar comandos.
 
-Exemplos prontos:
-
-1. Criar tarefa:
-/tarefa criar identidade visual da marca
-
-2. Criar plano do dia:
-/dia
-
-3. Criar imagem:
-/imagem tênis cyberpunk em rua neon
-
-4. Criar logo:
-/logo Street Graff
-
-5. Criar negócio:
-/roadmap marca de roupa futurista
-
-6. Criar automação:
-/automacao postar conteúdo todo dia
-
-7. Criar conteúdo:
-/conteudo marca streetwear
-
-8. Criar SaaS:
-/saas agente IA para empresas locais
-
-9. Salvar lembrete:
-/lembrete gravar vídeos amanhã
-
-10. Ver menu:
-/menu
+Exemplos:
+/ceo quero criar uma marca streetwear
+/brandagent Street Graff
+/contentagent marca futurista
+/salesagent camiseta premium
+/devagent criar site da marca
+/autoagent postar conteúdo todo dia
+/agent quero lançar uma marca do zero
 """)
 
 async def comandos(update, context):
     await update.message.reply_text("""
-📌 LISTA COMPLETA
+📌 COMANDOS
 
-/start
-/status
-/menu
-/ajuda
-/comandos
-/memoria
+/start /status /menu /ajuda /comandos /memoria
 
-/tarefa
-/tarefas
-/check
-/concluir
+/tarefa /tarefas /check /concluir
+/imagem /logo
 
-/imagem
-/logo
+/roadmap /automacao /conteudo /oferta /branding /saas /site /doc
 
-/roadmap
-/automacao
-/conteudo
-/oferta
-/branding
-/saas
-/site
-/doc
+/agenda /lembrete /lembretes /rotina /habito /habitos /dia
 
-/agenda
-/lembrete
-/lembretes
-/rotina
-/habito
-/habitos
-/dia
+/ceo /brandagent /contentagent /salesagent /devagent /autoagent /agent
 """)
-
-async def start(update, context):
-    await update.message.reply_text("🔥 StreetCore AI online. Digite /menu para ver tudo que posso fazer.")
 
 async def status(update, context):
     await update.message.reply_text(f"""
@@ -218,7 +216,7 @@ Assistente pessoal: {len(load_json(FILES["assistant"], []))}
 Sistema: ONLINE
 IA: Groq grátis
 Imagem: Pollinations grátis
-Modo: OPERAÇÃO TOTAL
+Modo: MULTIAGENTES
 """)
 
 async def memoria(update, context):
@@ -286,38 +284,38 @@ async def logo(update, context):
     await update.message.reply_text("🔥 Criando logo...")
     await update.message.reply_photo(photo=image_url(f"minimal futuristic luxury logo, white background, premium branding, {tema}"))
 
-async def generic(update, context, tipo, prompt_base):
+async def generic(update, context, tipo, prompt_base, agent=None):
     tema = " ".join(context.args)
     if not tema:
         await update.message.reply_text(f"Use:\n/{tipo} tema")
         return
-    resposta = ask_ai(f"{prompt_base}\n\nTema:\n{tema}")
+    resposta = ask_ai(f"{prompt_base}\n\nTema:\n{tema}", agent)
     save_item(tipo, tema, resposta)
     await send_long(update, resposta)
 
 async def roadmap(update, context):
-    await generic(update, context, "roadmap", "Crie um roadmap executivo completo com estratégia, execução, monetização, ferramentas grátis, plano de 7 dias e 30 dias.")
+    await generic(update, context, "roadmap", "Crie roadmap executivo completo com estratégia, execução, monetização, ferramentas grátis, plano de 7 dias e 30 dias.", "ceo")
 
 async def automacao(update, context):
-    await generic(update, context, "automacao", "Crie uma automação gratuita com ferramentas grátis, fluxo, passo a passo, execução e erros comuns.")
+    await generic(update, context, "automacao", "Crie automação gratuita com ferramentas grátis, fluxo, passo a passo, execução e erros comuns.", "automacao")
 
 async def conteudo(update, context):
-    await generic(update, context, "conteudo", "Crie conteúdo viral premium para Instagram/TikTok com gancho, legenda, CTA, hashtags e ideia visual.")
+    await generic(update, context, "conteudo", "Crie conteúdo viral premium para Instagram/TikTok com gancho, legenda, CTA, hashtags e ideia visual.", "conteudo")
 
 async def oferta(update, context):
-    await generic(update, context, "oferta", "Crie uma oferta irresistível com dor, promessa, mecanismo único, bônus, urgência ética, preço sugerido e CTA.")
+    await generic(update, context, "oferta", "Crie oferta irresistível com dor, promessa, mecanismo único, bônus, urgência ética, preço sugerido e CTA.", "vendas")
 
 async def branding(update, context):
-    await generic(update, context, "branding", "Crie branding completo com essência, posicionamento, público, personalidade, tom de voz, paleta, manifesto e próximos passos.")
+    await generic(update, context, "branding", "Crie branding completo com essência, posicionamento, público, personalidade, tom de voz, paleta, manifesto e próximos passos.", "branding")
 
 async def saas(update, context):
-    await generic(update, context, "saas", "Crie arquitetura completa de SaaS usando ferramentas grátis, incluindo MVP, features, stack, banco, login, dashboard, monetização e roadmap.")
+    await generic(update, context, "saas", "Crie arquitetura completa de SaaS usando ferramentas grátis, incluindo MVP, features, stack, banco, login, dashboard, monetização e roadmap.", "dev")
 
 async def site(update, context):
-    await generic(update, context, "site", "Crie um site completo com estrutura, copy, design, HTML/CSS simples, como testar e como publicar grátis.")
+    await generic(update, context, "site", "Crie site completo com estrutura, copy, design, HTML/CSS simples, como testar e publicar grátis.", "dev")
 
 async def doc(update, context):
-    await generic(update, context, "doc", "Crie um documento profissional completo, organizado, claro, pronto para copiar e usar.")
+    await generic(update, context, "doc", "Crie documento profissional completo, organizado, claro, pronto para copiar e usar.", "ceo")
 
 def save_assistant(tipo, conteudo):
     data = load_json(FILES["assistant"], [])
@@ -353,7 +351,7 @@ async def lembretes(update, context):
 
 async def rotina(update, context):
     tema = " ".join(context.args) or "minha rotina ideal"
-    resposta = ask_ai(f"Crie uma rotina diária prática e inteligente para: {tema}")
+    resposta = ask_ai(f"Crie rotina diária prática e inteligente para: {tema}", "assistente")
     save_assistant("rotina", resposta)
     await send_long(update, resposta)
 
@@ -389,7 +387,53 @@ Agenda, lembretes e hábitos:
 {assist}
 
 Inclua prioridade máxima, agenda, 3 tarefas essenciais, hábitos, bloco de foco e próximo passo.
-""")
+""", "assistente")
+    await send_long(update, resposta)
+
+async def ceo(update, context):
+    await generic(update, context, "ceo_agent", "Analise como CEO e entregue estratégia, prioridade, plano de ação e próximos passos.", "ceo")
+
+async def brandagent(update, context):
+    await generic(update, context, "branding_agent", "Analise como diretor de branding premium e entregue identidade, posicionamento, estética e tom de voz.", "branding")
+
+async def contentagent(update, context):
+    await generic(update, context, "content_agent", "Analise como estrategista de conteúdo viral e entregue calendário, ideias, roteiros e execução.", "conteudo")
+
+async def salesagent(update, context):
+    await generic(update, context, "sales_agent", "Analise como especialista em vendas e entregue oferta, copy, funil e fechamento.", "vendas")
+
+async def devagent(update, context):
+    await generic(update, context, "dev_agent", "Analise como programador full-stack e entregue arquitetura, stack grátis, código/estrutura e deploy.", "dev")
+
+async def autoagent(update, context):
+    await generic(update, context, "automation_agent", "Analise como engenheiro de automação e entregue fluxo, ferramentas grátis, execução e teste.", "automacao")
+
+async def agent(update, context):
+    tema = " ".join(context.args)
+    if not tema:
+        await update.message.reply_text("Use:\n/agent problema ou objetivo")
+        return
+
+    prompt = f"""
+Resolva este objetivo usando múltiplos agentes internos:
+
+Objetivo:
+{tema}
+
+Estruture a resposta assim:
+
+1. CEO Agent — decisão estratégica
+2. Branding Agent — direção de marca
+3. Content Agent — crescimento orgânico
+4. Sales Agent — monetização
+5. Dev Agent — sistema/tecnologia
+6. Automation Agent — automações gratuitas
+7. Personal Assistant Agent — rotina e execução
+8. Plano final integrado
+9. Próximo passo imediato
+"""
+    resposta = ask_ai(prompt)
+    save_item("multiagent", tema, resposta)
     await send_long(update, resposta)
 
 async def handle_message(update, context):
@@ -401,33 +445,17 @@ async def handle_message(update, context):
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 commands = {
-    "start": start,
-    "menu": menu,
-    "ajuda": ajuda,
-    "comandos": comandos,
-    "status": status,
-    "memoria": memoria,
-    "tarefa": tarefa,
-    "tarefas": tarefas,
-    "check": check,
-    "concluir": concluir,
-    "imagem": imagem,
-    "logo": logo,
-    "roadmap": roadmap,
-    "automacao": automacao,
-    "conteudo": conteudo,
-    "oferta": oferta,
-    "branding": branding,
-    "saas": saas,
-    "site": site,
-    "doc": doc,
-    "agenda": agenda,
-    "lembrete": lembrete,
-    "lembretes": lembretes,
-    "rotina": rotina,
-    "habito": habito,
-    "habitos": habitos,
-    "dia": dia
+    "start": start, "menu": menu, "ajuda": ajuda, "comandos": comandos,
+    "status": status, "memoria": memoria,
+    "tarefa": tarefa, "tarefas": tarefas, "check": check, "concluir": concluir,
+    "imagem": imagem, "logo": logo,
+    "roadmap": roadmap, "automacao": automacao, "conteudo": conteudo, "oferta": oferta,
+    "branding": branding, "saas": saas, "site": site, "doc": doc,
+    "agenda": agenda, "lembrete": lembrete, "lembretes": lembretes,
+    "rotina": rotina, "habito": habito, "habitos": habitos, "dia": dia,
+    "ceo": ceo, "brandagent": brandagent, "contentagent": contentagent,
+    "salesagent": salesagent, "devagent": devagent, "autoagent": autoagent,
+    "agent": agent
 }
 
 for name, func in commands.items():
@@ -435,5 +463,5 @@ for name, func in commands.items():
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("🔥 STREETCORE AI COMMAND CENTER ONLINE")
+print("🔥 STREETCORE AI MULTIAGENT MODE ONLINE")
 app.run_polling()
