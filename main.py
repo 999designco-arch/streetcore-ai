@@ -39,12 +39,7 @@ def memory():
 
 def save_item(tipo, tema, conteudo):
     data = load_json(FILES["items"], [])
-    data.append({
-        "tipo": tipo,
-        "tema": tema,
-        "conteudo": conteudo,
-        "data": str(datetime.now())
-    })
+    data.append({"tipo": tipo, "tema": tema, "conteudo": conteudo, "data": str(datetime.now())})
     save_json(FILES["items"], data)
 
 def auto_memory(msg):
@@ -82,21 +77,104 @@ async def send_long(update, text):
         await update.message.reply_text(text[i:i+3900])
 
 def image_url(prompt):
-    p = urllib.parse.quote(
-        f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, 8k. {prompt}"
-    )
+    p = urllib.parse.quote(f"ultra realistic cinematic image, street luxury futuristic, cyberpunk premium, 8k. {prompt}")
     return f"https://image.pollinations.ai/prompt/{p}?width=1024&height=1024&seed=77"
 
-async def start(update, context):
+async def menu(update, context):
     await update.message.reply_text("""
-🔥 STREETCORE AI ONLINE
+🔥 STREETCORE AI — CENTRAL DE COMANDOS
 
-MODOS ATIVOS:
-CEO, Branding, Conteúdo, Vendas, SaaS, Dev, Documentos, Automação e Assistente Pessoal.
+ESSENCIAL:
+/start — iniciar o agente
+/status — ver status
+/menu — abrir este menu
+/ajuda — explicar como usar
+/comandos — lista completa
 
-COMANDOS PRINCIPAIS:
+MEMÓRIA:
+/memoria — ver memórias
 
+TAREFAS:
+/tarefa criar algo
+/tarefas
+/check
+/concluir 1
+
+IMAGEM:
+/imagem descrição
+/logo nome da marca
+
+CEO / NEGÓCIOS:
+/roadmap objetivo
+/automacao objetivo
+/conteudo tema
+/oferta produto
+/branding marca
+/saas ideia
+/site ideia
+/doc tema
+
+ASSISTENTE PESSOAL:
+/agenda compromisso
+/lembrete algo
+/lembretes
+/rotina objetivo
+/habito hábito
+/habitos
+/dia
+
+Exemplo:
+/roadmap criar uma marca streetwear futurista
+""")
+
+async def ajuda(update, context):
+    await update.message.reply_text("""
+🧠 COMO USAR O STREETCORE AI
+
+Você pode falar normalmente comigo ou usar comandos.
+
+Exemplos prontos:
+
+1. Criar tarefa:
+/tarefa criar identidade visual da marca
+
+2. Criar plano do dia:
+/dia
+
+3. Criar imagem:
+/imagem tênis cyberpunk em rua neon
+
+4. Criar logo:
+/logo Street Graff
+
+5. Criar negócio:
+/roadmap marca de roupa futurista
+
+6. Criar automação:
+/automacao postar conteúdo todo dia
+
+7. Criar conteúdo:
+/conteudo marca streetwear
+
+8. Criar SaaS:
+/saas agente IA para empresas locais
+
+9. Salvar lembrete:
+/lembrete gravar vídeos amanhã
+
+10. Ver menu:
+/menu
+""")
+
+async def comandos(update, context):
+    await update.message.reply_text("""
+📌 LISTA COMPLETA
+
+/start
 /status
+/menu
+/ajuda
+/comandos
 /memoria
 
 /tarefa
@@ -116,7 +194,6 @@ COMANDOS PRINCIPAIS:
 /site
 /doc
 
-ASSISTENTE PESSOAL:
 /agenda
 /lembrete
 /lembretes
@@ -125,6 +202,9 @@ ASSISTENTE PESSOAL:
 /habitos
 /dia
 """)
+
+async def start(update, context):
+    await update.message.reply_text("🔥 StreetCore AI online. Digite /menu para ver tudo que posso fazer.")
 
 async def status(update, context):
     await update.message.reply_text(f"""
@@ -241,17 +321,13 @@ async def doc(update, context):
 
 def save_assistant(tipo, conteudo):
     data = load_json(FILES["assistant"], [])
-    data.append({
-        "tipo": tipo,
-        "conteudo": conteudo,
-        "data": str(datetime.now())
-    })
+    data.append({"tipo": tipo, "conteudo": conteudo, "data": str(datetime.now())})
     save_json(FILES["assistant"], data)
 
 async def agenda(update, context):
     item = " ".join(context.args)
     if not item:
-        await update.message.reply_text("Use:\n/agenda compromisso ou evento")
+        await update.message.reply_text("Use:\n/agenda compromisso")
         return
     save_assistant("agenda", item)
     await update.message.reply_text(f"📅 Agenda salva:\n{item}")
@@ -259,7 +335,7 @@ async def agenda(update, context):
 async def lembrete(update, context):
     item = " ".join(context.args)
     if not item:
-        await update.message.reply_text("Use:\n/lembrete algo que devo lembrar")
+        await update.message.reply_text("Use:\n/lembrete algo")
         return
     save_assistant("lembrete", item)
     await update.message.reply_text(f"🔔 Lembrete salvo:\n{item}")
@@ -277,29 +353,14 @@ async def lembretes(update, context):
 
 async def rotina(update, context):
     tema = " ".join(context.args) or "minha rotina ideal"
-    resposta = ask_ai(f"""
-Crie uma rotina diária prática e inteligente para:
-
-{tema}
-
-Inclua:
-1. Manhã
-2. Meio do dia
-3. Tarde
-4. Noite
-5. Bloco de foco
-6. Bloco de criação
-7. Bloco de aprendizado
-8. O que evitar
-9. Versão simples para iniciante
-""")
+    resposta = ask_ai(f"Crie uma rotina diária prática e inteligente para: {tema}")
     save_assistant("rotina", resposta)
     await send_long(update, resposta)
 
 async def habito(update, context):
     item = " ".join(context.args)
     if not item:
-        await update.message.reply_text("Use:\n/habito hábito que quer criar")
+        await update.message.reply_text("Use:\n/habito hábito")
         return
     save_assistant("habito", item)
     await update.message.reply_text(f"✅ Hábito salvo:\n{item}")
@@ -327,14 +388,7 @@ Tarefas:
 Agenda, lembretes e hábitos:
 {assist}
 
-Estruture:
-1. Prioridade máxima
-2. Agenda do dia
-3. 3 tarefas essenciais
-4. Hábitos do dia
-5. Bloco de foco de 2 horas
-6. O que evitar
-7. Próximo passo imediato
+Inclua prioridade máxima, agenda, 3 tarefas essenciais, hábitos, bloco de foco e próximo passo.
 """)
     await send_long(update, resposta)
 
@@ -348,6 +402,9 @@ app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 commands = {
     "start": start,
+    "menu": menu,
+    "ajuda": ajuda,
+    "comandos": comandos,
     "status": status,
     "memoria": memoria,
     "tarefa": tarefa,
@@ -378,5 +435,5 @@ for name, func in commands.items():
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-print("🔥 STREETCORE AI PERSONAL ASSISTANT MODE ONLINE")
+print("🔥 STREETCORE AI COMMAND CENTER ONLINE")
 app.run_polling()
