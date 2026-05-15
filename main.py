@@ -1,9 +1,11 @@
 import os
 import json
+import sqlite3
 import urllib.parse
 import threading
 
 from flask import Flask, jsonify, request, render_template_string
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -12,6 +14,7 @@ from telegram.ext import (
 )
 
 from groq import Groq
+from pypdf import PdfReader
 
 # =========================================
 # CONFIG
@@ -24,109 +27,40 @@ PORT = int(os.getenv("PORT", 8080))
 client = Groq(api_key=GROQ_API_KEY)
 
 # =========================================
-# FILES
+# DATABASE
 # =========================================
 
-FILES = {
-    "memory": "memory.json",
-    "tasks": "tasks.json",
-    "items": "items.json"
-}
+conn = sqlite3.connect(
+    "streetcore.db",
+    check_same_thread=False
+)
 
-# =========================================
-# HELPERS
-# =========================================
+cursor = conn.cursor()
 
-def load_json(file, default):
-    if not os.path.exists(file):
-        return default
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS memory(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+content TEXT
+)
+""")
 
-    try:
-        with open(file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return default
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tasks(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+task TEXT
+)
+""")
 
-def save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS history(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+agent TEXT,
+prompt TEXT,
+response TEXT
+)
+""")
 
-# =========================================
-# MEMORY
-# =========================================
-
-def get_memory():
-    mem = load_json(FILES["memory"], {})
-
-    mem.setdefault("perfil", {})
-    mem.setdefault("objetivos", [])
-    mem.setdefault("preferencias", [])
-
-    return mem
-
-def save_memory(mem):
-    save_json(FILES["memory"], mem)
-
-# =========================================
-# AGENTS
-# =========================================
-
-AGENTS = {
-
-    "ceo":
-    """
-    Você é um CEO bilionário especialista em:
-    - crescimento
-    - monetização
-    - SaaS
-    - negócios digitais
-    - IA
-    - escala
-    """,
-
-    "marketing":
-    """
-    Você é um especialista extremo em:
-    - marketing
-    - branding
-    - viralização
-    - conteúdo
-    - copywriting
-    - funis
-    """,
-
-    "dev":
-    """
-    Você é um engenheiro de software especialista em:
-    - Python
-    - IA
-    - automação
-    - SaaS
-    - APIs
-    - arquitetura
-    """,
-
-    "design":
-    """
-    Você é diretor criativo premium especialista em:
-    - branding
-    - design futurista
-    - cyberpunk premium
-    - cinematic
-    - thumbnails
-    - logos
-    """,
-
-    "automation":
-    """
-    Você é especialista em:
-    - automações
-    - produtividade
-    - agentes IA
-    - sistemas autônomos
-    - workflows
-    """
-}
+conn.commit()
 
 # =========================================
 # MASTER PROMPT
@@ -137,34 +71,96 @@ Você é StreetCore OS.
 
 Um sistema operacional IA avançado.
 
-Responda sempre:
+Você possui:
+- inteligência de CEO;
+- branding premium;
+- automação;
+- programação;
+- growth hacking;
+- criação de conteúdo;
+- engenharia de IA;
+- marketing;
+- direção criativa.
+
+Responda:
 - em português;
 - de forma prática;
 - passo a passo;
 - como se estivesse fazendo pelo usuário.
 
-Você possui:
-- inteligência de CEO;
-- engenharia de IA;
-- branding premium;
-- automação;
-- growth hacking;
-- criação de conteúdo;
-- direção criativa;
-- produtividade extrema.
-
-Use apenas ferramentas gratuitas ou plano grátis.
-
-Seja extremamente estratégico.
+Use ferramentas gratuitas.
 """
 
 # =========================================
-# IA
+# AGENTS
+# =========================================
+
+AGENTS = {
+
+"ceo":
+"""
+Você é um CEO especialista em:
+- negócios digitais
+- monetização
+- SaaS
+- crescimento
+- IA
+- escala
+""",
+
+"marketing":
+"""
+Você é especialista em:
+- branding
+- marketing
+- conteúdo
+- viralização
+- copywriting
+""",
+
+"dev":
+"""
+Você é engenheiro especialista em:
+- Python
+- APIs
+- IA
+- automação
+- SaaS
+""",
+
+"design":
+"""
+Você é diretor criativo premium especialista em:
+- cyberpunk premium
+- branding
+- thumbnails
+- logos
+- cinematic
+""",
+
+"automation":
+"""
+Você é especialista em:
+- agentes IA
+- automações
+- produtividade
+- workflows
+"""
+}
+
+# =========================================
+# AI
 # =========================================
 
 def ask_ai(prompt, role="ceo"):
 
-    memory = json.dumps(get_memory(), ensure_ascii=False)
+    memories = cursor.execute(
+        "SELECT content FROM memory ORDER BY id DESC LIMIT 20"
+    ).fetchall()
+
+    memory_text = "\n".join(
+        [m[0] for m in memories]
+    )
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -182,7 +178,7 @@ def ask_ai(prompt, role="ceo"):
             {
                 "role":"system",
                 "content":
-                f"MEMÓRIA:\n{memory}"
+                f"MEMÓRIA:\n{memory_text}"
             },
 
             {
@@ -195,10 +191,19 @@ def ask_ai(prompt, role="ceo"):
         max_tokens=3000
     )
 
-    return response.choices[0].message.content
+    result = response.choices[0].message.content
+
+    cursor.execute(
+        "INSERT INTO history(agent,prompt,response) VALUES(?,?,?)",
+        (role,prompt,result)
+    )
+
+    conn.commit()
+
+    return result
 
 # =========================================
-# IMAGE AI
+# IMAGE
 # =========================================
 
 def image_url(prompt):
@@ -214,14 +219,19 @@ def image_url(prompt):
 async def start(update, context):
 
     await update.message.reply_text(
-        "🔥 StreetCore OS online.\n\nDigite /menu"
-    )
+"""
+🔥 StreetCore OS V3 online.
+
+Digite:
+/menu
+"""
+)
 
 async def menu(update, context):
 
     await update.message.reply_text(
 """
-🔥 STREETCORE OS
+🔥 STREETCORE OS V3
 
 /completo ideia
 /ceo ideia
@@ -237,7 +247,11 @@ async def menu(update, context):
 /tarefa texto
 /tarefas
 
-/memoria
+/salvar memoria
+/memorias
+
+/historico
+
 /status
 """
 )
@@ -248,35 +262,34 @@ async def menu(update, context):
 
 async def status(update, context):
 
-    tasks = load_json(FILES["tasks"], [])
-    items = load_json(FILES["items"], [])
+    task_count = cursor.execute(
+        "SELECT COUNT(*) FROM tasks"
+    ).fetchone()[0]
+
+    history_count = cursor.execute(
+        "SELECT COUNT(*) FROM history"
+    ).fetchone()[0]
+
+    mem_count = cursor.execute(
+        "SELECT COUNT(*) FROM memory"
+    ).fetchone()[0]
 
     await update.message.reply_text(
 f"""
 🔥 STREETCORE STATUS
 
-Tarefas: {len(tasks)}
-Itens: {len(items)}
+Memórias: {mem_count}
+Tarefas: {task_count}
+Histórico: {history_count}
 
 Sistema:
 ✅ Online
+✅ Dashboard
+✅ Multi Agents
+✅ Banco SQLite
 ✅ IA ativa
-✅ Dashboard ativo
-✅ Multi Agents ativo
 """
 )
-
-# =========================================
-# MEMORY
-# =========================================
-
-async def memoria(update, context):
-
-    mem = get_memory()
-
-    text = json.dumps(mem, ensure_ascii=False, indent=2)
-
-    await update.message.reply_text(text[:4000])
 
 # =========================================
 # TASKS
@@ -286,13 +299,12 @@ async def tarefa(update, context):
 
     text = " ".join(context.args)
 
-    tasks = load_json(FILES["tasks"], [])
+    cursor.execute(
+        "INSERT INTO tasks(task) VALUES(?)",
+        (text,)
+    )
 
-    tasks.append({
-        "task": text
-    })
-
-    save_json(FILES["tasks"], tasks)
+    conn.commit()
 
     await update.message.reply_text(
         "✅ tarefa salva"
@@ -300,7 +312,9 @@ async def tarefa(update, context):
 
 async def tarefas(update, context):
 
-    tasks = load_json(FILES["tasks"], [])
+    tasks = cursor.execute(
+        "SELECT * FROM tasks ORDER BY id DESC LIMIT 30"
+    ).fetchall()
 
     if not tasks:
 
@@ -312,14 +326,75 @@ async def tarefas(update, context):
 
     text = "🧠 TAREFAS\n\n"
 
-    for i, task in enumerate(tasks):
+    for task in tasks:
 
-        text += f"{i+1}. {task['task']}\n"
+        text += f"{task[0]}. {task[1]}\n"
 
     await update.message.reply_text(text)
 
 # =========================================
-# GENERIC AGENT
+# MEMORY
+# =========================================
+
+async def salvar(update, context):
+
+    text = " ".join(context.args)
+
+    cursor.execute(
+        "INSERT INTO memory(content) VALUES(?)",
+        (text,)
+    )
+
+    conn.commit()
+
+    await update.message.reply_text(
+        "🧠 memória salva"
+    )
+
+async def memorias(update, context):
+
+    memories = cursor.execute(
+        "SELECT * FROM memory ORDER BY id DESC LIMIT 20"
+    ).fetchall()
+
+    text = "🧠 MEMÓRIAS\n\n"
+
+    for mem in memories:
+
+        text += f"{mem[0]}. {mem[1]}\n\n"
+
+    await update.message.reply_text(
+        text[:4000]
+    )
+
+# =========================================
+# HISTORY
+# =========================================
+
+async def historico(update, context):
+
+    data = cursor.execute(
+        "SELECT * FROM history ORDER BY id DESC LIMIT 10"
+    ).fetchall()
+
+    text = "📚 HISTÓRICO\n\n"
+
+    for item in data:
+
+        text += f"""
+ID: {item[0]}
+AGENTE: {item[1]}
+PROMPT: {item[2][:80]}
+
+-------------------
+"""
+
+    await update.message.reply_text(
+        text[:4000]
+    )
+
+# =========================================
+# AGENT
 # =========================================
 
 async def generic_agent(update, context, role):
@@ -336,16 +411,6 @@ async def generic_agent(update, context, role):
 
     response = ask_ai(prompt, role)
 
-    items = load_json(FILES["items"], [])
-
-    items.append({
-        "agent": role,
-        "prompt": prompt,
-        "response": response
-    })
-
-    save_json(FILES["items"], items)
-
     for i in range(0, len(response), 3900):
 
         await update.message.reply_text(
@@ -360,14 +425,6 @@ async def completo(update, context):
 
     prompt = " ".join(context.args)
 
-    if not prompt:
-
-        await update.message.reply_text(
-            "Digite algo."
-        )
-
-        return
-
     final = ""
 
     for role in AGENTS.keys():
@@ -375,16 +432,6 @@ async def completo(update, context):
         result = ask_ai(prompt, role)
 
         final += f"\n\n### {role.upper()}\n\n{result}"
-
-    items = load_json(FILES["items"], [])
-
-    items.append({
-        "agent":"multi",
-        "prompt":prompt,
-        "response":final
-    })
-
-    save_json(FILES["items"], items)
 
     for i in range(0, len(final), 3900):
 
@@ -419,10 +466,9 @@ async def logo(update, context):
     await update.message.reply_photo(
         photo=image_url(
             f"""
-            minimal luxury logo,
-            futuristic branding,
+            futuristic luxury logo,
+            minimal,
             clean vector,
-            white background,
             premium brand,
             {prompt}
             """
@@ -438,7 +484,6 @@ async def thumb(update, context):
             f"""
             youtube thumbnail,
             cinematic,
-            high ctr,
             viral,
             futuristic,
             dramatic,
@@ -483,7 +528,7 @@ async def normal_chat(update, context):
         )
 
 # =========================================
-# FLASK WEB
+# WEB
 # =========================================
 
 web = Flask(__name__)
@@ -499,19 +544,13 @@ HTML = """
 
 <style>
 
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial;
-}
-
 body{
 background:#050510;
 color:white;
+font-family:Arial;
+margin:0;
 display:flex;
 height:100vh;
-overflow:hidden;
 }
 
 .sidebar{
@@ -519,30 +558,13 @@ width:260px;
 background:#0d0d18;
 padding:20px;
 border-right:1px solid #222;
-display:flex;
-flex-direction:column;
-gap:12px;
 }
 
 .logo{
 font-size:28px;
 font-weight:bold;
 color:#9333ea;
-margin-bottom:10px;
-}
-
-.btn{
-padding:14px;
-background:#151525;
-border:none;
-border-radius:12px;
-color:white;
-text-align:left;
-cursor:pointer;
-}
-
-.btn:hover{
-background:#222240;
+margin-bottom:20px;
 }
 
 .main{
@@ -558,14 +580,12 @@ display:flex;
 align-items:center;
 padding:0 20px;
 border-bottom:1px solid #222;
-font-size:20px;
-font-weight:bold;
 }
 
 .chat{
 flex:1;
-overflow:auto;
 padding:30px;
+overflow:auto;
 display:flex;
 flex-direction:column;
 gap:20px;
@@ -575,8 +595,8 @@ gap:20px;
 padding:18px;
 border-radius:18px;
 max-width:850px;
-line-height:1.6;
 white-space:pre-wrap;
+line-height:1.6;
 }
 
 .user{
@@ -586,16 +606,14 @@ align-self:flex-end;
 
 .ai{
 background:#111827;
-align-self:flex-start;
 border:1px solid #333;
 }
 
 .input-area{
 padding:20px;
-background:#0d0d18;
 display:flex;
 gap:15px;
-border-top:1px solid #222;
+background:#0d0d18;
 }
 
 input{
@@ -605,27 +623,15 @@ border:none;
 border-radius:14px;
 background:#151525;
 color:white;
-font-size:16px;
 }
 
 button{
 padding:18px 24px;
+background:#9333ea;
 border:none;
 border-radius:14px;
-background:#9333ea;
 color:white;
 cursor:pointer;
-font-weight:bold;
-}
-
-button:hover{
-background:#7e22ce;
-}
-
-.status{
-margin-top:auto;
-font-size:13px;
-opacity:.7;
 }
 
 </style>
@@ -640,41 +646,7 @@ opacity:.7;
 🔥 StreetCore OS
 </div>
 
-<button class="btn">
-Dashboard
-</button>
-
-<button class="btn">
-Agentes IA
-</button>
-
-<button class="btn">
-Automação
-</button>
-
-<button class="btn">
-Marketing
-</button>
-
-<button class="btn">
-Branding
-</button>
-
-<button class="btn">
-Conteúdo
-</button>
-
-<button class="btn">
-Vídeos
-</button>
-
-<button class="btn">
-Imagens
-</button>
-
-<div class="status">
-ONLINE • GOD MODE
-</div>
+<p>ONLINE • GOD MODE</p>
 
 </div>
 
@@ -687,18 +659,9 @@ StreetCore AI Operating System
 <div class="chat" id="chat">
 
 <div class="msg ai">
-🔥 StreetCore OS online.
+🔥 StreetCore OS V3 online.
 
 Sistema operacional IA iniciado.
-
-Pronto para:
-- criar empresas;
-- automatizar tarefas;
-- criar conteúdo;
-- criar imagens;
-- criar estratégias;
-- gerar branding;
-- gerar negócios.
 </div>
 
 </div>
@@ -725,7 +688,8 @@ async function sendMessage(){
 const input =
 document.getElementById("prompt");
 
-const text = input.value;
+const text =
+input.value;
 
 if(!text) return;
 
@@ -782,7 +746,7 @@ def ask_web():
 
     data = request.get_json()
 
-    prompt = data.get("prompt", "")
+    prompt = data.get("prompt","")
 
     response = ask_ai(prompt)
 
@@ -795,20 +759,20 @@ def api_status():
 
     return jsonify({
 
-        "memory":
-        get_memory(),
-
         "tasks":
-        load_json(
-            FILES["tasks"],
-            []
-        ),
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks"
+        ).fetchone()[0],
 
-        "items":
-        load_json(
-            FILES["items"],
-            []
-        )
+        "history":
+        cursor.execute(
+            "SELECT COUNT(*) FROM history"
+        ).fetchone()[0],
+
+        "memory":
+        cursor.execute(
+            "SELECT COUNT(*) FROM memory"
+        ).fetchone()[0]
     })
 
 # =========================================
@@ -823,7 +787,7 @@ def run_web():
     )
 
 # =========================================
-# TELEGRAM APP
+# TELEGRAM
 # =========================================
 
 app = (
@@ -839,10 +803,14 @@ app = (
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("menu", menu))
 app.add_handler(CommandHandler("status", status))
-app.add_handler(CommandHandler("memoria", memoria))
 
 app.add_handler(CommandHandler("tarefa", tarefa))
 app.add_handler(CommandHandler("tarefas", tarefas))
+
+app.add_handler(CommandHandler("salvar", salvar))
+app.add_handler(CommandHandler("memorias", memorias))
+
+app.add_handler(CommandHandler("historico", historico))
 
 app.add_handler(CommandHandler("imagem", imagem))
 app.add_handler(CommandHandler("logo", logo))
@@ -873,6 +841,6 @@ threading.Thread(
     daemon=True
 ).start()
 
-print("🔥 STREETCORE OS ONLINE")
+print("🔥 STREETCORE OS V3 ONLINE")
 
 app.run_polling()
