@@ -292,4 +292,229 @@ async def historico(update, context):
     rows = cursor.execute("SELECT id, agent, prompt FROM history ORDER BY id DESC LIMIT 20").fetchall()
     text = "📚 HISTÓRICO\n\n"
     for r in rows:
-        text += f"{r[0]}. {r[1]} — {r[2][:100]
+        text += f"{r[0]}. {r[1]} — {r[2][:100]}\n\n"
+    await send_long(update, text if rows else "Sem histórico.")
+
+async def analytics(update, context):
+    rows = cursor.execute("SELECT event, COUNT(*) FROM analytics GROUP BY event").fetchall()
+    text = "📊 ANALYTICS\n\n"
+    for r in rows:
+        text += f"{r[0]}: {r[1]}\n"
+    await send_long(update, text if rows else "Sem analytics.")
+
+async def imagem(update, context):
+    prompt = " ".join(context.args)
+    await update.message.reply_photo(photo=image_url(f"ultra realistic cinematic cyberpunk premium 8k, {prompt}"))
+
+async def logo(update, context):
+    prompt = " ".join(context.args)
+    await update.message.reply_photo(photo=image_url(f"minimal futuristic luxury logo, white background, clean vector, {prompt}"))
+
+async def thumb(update, context):
+    prompt = " ".join(context.args)
+    await update.message.reply_photo(photo=image_url(f"viral youtube thumbnail, cinematic, high CTR, premium futuristic, {prompt}"))
+
+async def post(update, context):
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("Use: /post instagram tema")
+        return
+    platform = args[0]
+    theme = " ".join(args[1:])
+    content = ask_ai(f"Crie um post completo para {platform} sobre: {theme}. Inclua legenda, CTA, hashtags, ideia visual e versão curta.", "marketing")
+    cursor.execute("INSERT INTO posts(platform,theme,content,status,created_at) VALUES(?,?,?,?,?)", (platform, theme, content, "rascunho", now()))
+    conn.commit()
+    await send_long(update, content)
+
+async def posts(update, context):
+    rows = cursor.execute("SELECT id, platform, theme, status FROM posts ORDER BY id DESC LIMIT 30").fetchall()
+    text = "📲 POSTS\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2]} — {r[3]}\n"
+    await send_long(update, text if rows else "Nenhum post.")
+
+async def videoai(update, context):
+    theme = " ".join(context.args)
+    script = ask_ai(f"Crie um vídeo IA completo sobre: {theme}. Inclua roteiro, cenas, prompts de vídeo, narração, texto na tela e edição.", "video")
+    cursor.execute("INSERT INTO videos(theme,script,status,created_at) VALUES(?,?,?,?)", (theme, script, "roteiro", now()))
+    conn.commit()
+    await send_long(update, script)
+
+async def videos(update, context):
+    rows = cursor.execute("SELECT id, theme, status FROM videos ORDER BY id DESC LIMIT 30").fetchall()
+    text = "🎬 VÍDEOS\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2]}\n"
+    await send_long(update, text if rows else "Nenhum vídeo.")
+
+async def workflow(update, context):
+    text = " ".join(context.args)
+    steps = ask_ai(f"Crie um workflow automático gratuito para: {text}. Inclua etapas, ferramentas grátis, gatilhos, aprovações e execução.", "automation")
+    cursor.execute("INSERT INTO workflows(name,steps,status,created_at) VALUES(?,?,?,?)", (text, steps, "ativo", now()))
+    conn.commit()
+    await send_long(update, steps)
+
+async def workflows(update, context):
+    rows = cursor.execute("SELECT id, name, status FROM workflows ORDER BY id DESC LIMIT 30").fetchall()
+    text = "⚙️ WORKFLOWS\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2]}\n"
+    await send_long(update, text if rows else "Nenhum workflow.")
+
+async def copiloto(update, context):
+    goal = " ".join(context.args)
+    response = ask_ai(f"""
+Atue como copiloto operacional IA.
+
+Objetivo:
+{goal}
+
+Crie:
+1. diagnóstico
+2. plano de ação
+3. tarefas
+4. automações possíveis
+5. riscos
+6. próximos passos
+7. o que precisa de aprovação humana
+""", "automation")
+    await send_long(update, response)
+
+async def aprovar(update, context):
+    try:
+        approval_id = int(context.args[0])
+        cursor.execute("UPDATE approvals SET status=? WHERE id=?", ("aprovado", approval_id))
+        conn.commit()
+        await update.message.reply_text("✅ aprovado")
+    except:
+        await update.message.reply_text("Use: /aprovar 1")
+
+async def normal_chat(update, context):
+    text = update.message.text
+    if needs_approval(text):
+        cursor.execute("INSERT INTO approvals(action,status,created_at) VALUES(?,?,?)", (text, "pendente", now()))
+        conn.commit()
+        await update.message.reply_text("🛡 Ação sensível salva para aprovação. Use /aprovar ID.")
+        return
+    response = ask_ai(text)
+    await send_long(update, response)
+
+web = Flask(__name__)
+web.secret_key = "streetcore-secret"
+
+HTML = """
+<!doctype html>
+<html>
+<head>
+<title>StreetCore OS V5</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box;font-family:Arial}body{margin:0;background:#050510;color:white;display:flex;height:100vh;overflow:hidden}
+.sidebar{width:250px;background:#0d0d18;padding:20px;border-right:1px solid #222}
+.logo{font-size:26px;font-weight:bold;color:#9333ea;margin-bottom:8px}.status{font-size:12px;opacity:.7;margin-bottom:20px}
+.btn{display:block;width:100%;padding:12px;margin-bottom:10px;border:0;border-radius:12px;background:#151525;color:white;text-align:left}
+.main{flex:1;display:flex;flex-direction:column}.top{height:64px;background:#0d0d18;border-bottom:1px solid #222;display:flex;align-items:center;padding:0 20px;font-weight:bold}
+.chat{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:16px}.msg{padding:16px;border-radius:16px;max-width:900px;white-space:pre-wrap;line-height:1.5}
+.ai{background:#111827;border:1px solid #333}.user{background:#1f1f35;align-self:flex-end}.bottom{padding:14px;background:#0d0d18;border-top:1px solid #222;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px}input,select{flex:1;padding:14px;border:0;border-radius:12px;background:#151525;color:white}button{padding:14px 18px;border:0;border-radius:12px;background:#9333ea;color:white;font-weight:bold}
+.upload{background:#2563eb}@media(max-width:800px){body{flex-direction:column}.sidebar{width:100%;height:auto}.main{height:calc(100vh - 190px)}.row{flex-direction:column}button{width:100%}}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<div class="logo">🔥 StreetCore OS</div>
+<div class="status">V5 GOD MODE • ONLINE</div>
+<button class="btn" onclick="quick('Crie um plano para hoje')">Plano do dia</button>
+<button class="btn" onclick="quick('Crie posts automáticos para Instagram')">Posts</button>
+<button class="btn" onclick="quick('Crie um workflow automático')">Workflow</button>
+<button class="btn" onclick="quick('Crie roteiro de vídeo IA')">Vídeo IA</button>
+<button class="btn" onclick="window.location='/api/status'">API Status</button>
+</div>
+<div class="main">
+<div class="top">StreetCore AI Operating System</div>
+<div class="chat" id="chat">
+<div class="msg ai">🔥 StreetCore OS V5 GOD MODE online.
+
+✅ Chat IA
+✅ Upload IA
+✅ Posts automáticos
+✅ Vídeos IA
+✅ Workflows
+✅ Memória vetorial local
+✅ Analytics
+✅ Multiusuário base
+✅ Copiloto operacional</div>
+</div>
+<div class="bottom">
+<div class="row">
+<select id="agent">
+<option value="ceo">CEO</option>
+<option value="marketing">Marketing</option>
+<option value="dev">Dev</option>
+<option value="design">Design</option>
+<option value="video">Video</option>
+<option value="automation">Automation</option>
+<option value="sales">Sales</option>
+</select>
+<input id="prompt" placeholder="Digite sua ideia...">
+<button onclick="sendMessage()">Enviar</button>
+</div>
+<div class="row">
+<input type="file" id="file">
+<button class="upload" onclick="uploadFile()">Upload IA</button>
+</div>
+</div>
+</div>
+<script>
+function add(cls,text){document.getElementById('chat').innerHTML+=`<div class="msg ${cls}">${text}</div>`;document.getElementById('chat').scrollTop=999999}
+function quick(t){document.getElementById('prompt').value=t;sendMessage()}
+async function sendMessage(){
+const text=document.getElementById('prompt').value;const agent=document.getElementById('agent').value;if(!text)return;
+add('user',text);document.getElementById('prompt').value='';
+const r=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,agent:agent})});
+const d=await r.json();add('ai',d.response)}
+async function uploadFile(){
+const f=document.getElementById('file').files[0];if(!f){alert('Escolha um arquivo');return}
+const fd=new FormData();fd.append('file',f);
+const r=await fetch('/upload',{method:'POST',body:fd});const d=await r.json();add('ai',d.response)}
+</script>
+</body>
+</html>
+"""
+
+@web.route("/")
+def home():
+    return render_template_string(HTML)
+
+@web.route("/ask", methods=["POST"])
+def ask_web():
+    data = request.get_json()
+    prompt = data.get("prompt", "")
+    agent = data.get("agent", "ceo")
+
+    if needs_approval(prompt):
+        cursor.execute("INSERT INTO approvals(action,status,created_at) VALUES(?,?,?)", (prompt, "pendente", now()))
+        conn.commit()
+        return jsonify({"response": "🛡 Ação sensível criada para aprovação."})
+
+    response = ask_ai(prompt, agent)
+    return jsonify({"response": response})
+
+@web.route("/upload", methods=["POST"])
+def upload():
+    if "file" not in request.files:
+        return jsonify({"response": "Nenhum arquivo."})
+    file = request.files["file"]
+    filename = secure_filename(file.filename)
+    path = os.path.join("uploads", filename)
+    file.save(path)
+
+    content = ""
+    if filename.lower().endswith(".pdf"):
+        reader = PdfReader(path)
+        for page in reader.pages:
+            try:
+                content += page.extract_text() + "\n"
+            except:
+                pass
+    elif 
