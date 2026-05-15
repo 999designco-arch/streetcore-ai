@@ -1,0 +1,20 @@
+def gerar_grade_conteudo(tema):
+    return (
+        f"📅 GRADE DE CONTEÚDO - {tema.upper()}\n\n"
+        "SEGUNDA:\n"
+        "Post de produto + Story de bastidor\n\n"
+        "TERÇA:\n"
+        "Reels mostrando antes e depois\n\n"
+        "QUARTA:\n"
+        "Post de venda + Story com enquete\n\n"
+        "QUINTA:\n"
+        "Vídeo curto mostrando produção\n\n"
+        "SEXTA:\n"
+        "Post de prova social + chamada para orçamento\n\n"
+        "SÁBADO:\n"
+        "Reels promocional + Story com urgência\n\n"
+        "DOMINGO:\n"
+        "Conteúdo leve, bastidor ou inspiração\n\n"
+        "Horários sugeridos:\n"
+        "12h, 18h e 20h30."
+    )
