@@ -54,10 +54,33 @@ def iniciar_banco():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS calendario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            data TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS financeiro (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL,
+            valor REAL NOT NULL
+        )
+    """)
+
     conn.commit()
 
     conn.close()
 
-    print("✅ Banco SQLite V15 FREE iniciado.")
+    print("✅ Banco SQLite V16 FREE iniciado.")
 
     return True
