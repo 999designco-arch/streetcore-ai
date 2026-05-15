@@ -1,992 +1,295 @@
-import os
-import sqlite3
-import urllib.parse
-import threading
-
-from flask import (
-    Flask,
-    jsonify,
-    request,
-    render_template_string
-)
-
+import os, sqlite3, urllib.parse, threading, math, json
+from datetime import datetime
+from flask import Flask, jsonify, request, render_template_string, redirect, url_for, session
 from werkzeug.utils import secure_filename
-
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    filters
-)
-
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from groq import Groq
 from pypdf import PdfReader
-
-# =========================================
-# CONFIG
-# =========================================
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 8080))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "streetcore123")
 
 UPLOAD_FOLDER = "uploads"
-
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# =========================================
-# DATABASE
-# =========================================
-
-conn = sqlite3.connect(
-    "streetcore.db",
-    check_same_thread=False
-)
-
+conn = sqlite3.connect("streetcore.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS memory(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-content TEXT
-)
-""")
+tables = [
+"""CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, role TEXT)""",
+"""CREATE TABLE IF NOT EXISTS memory(id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS vectors(id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, vector TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, task TEXT, status TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS history(id INTEGER PRIMARY KEY AUTOINCREMENT, agent TEXT, prompt TEXT, response TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, content TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT, theme TEXT, content TEXT, status TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS videos(id INTEGER PRIMARY KEY AUTOINCREMENT, theme TEXT, script TEXT, status TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS workflows(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, steps TEXT, status TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS approvals(id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, status TEXT, created_at TEXT)""",
+"""CREATE TABLE IF NOT EXISTS analytics(id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, data TEXT, created_at TEXT)"""
+]
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS tasks(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-task TEXT
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS history(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-agent TEXT,
-prompt TEXT,
-response TEXT
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS files(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-filename TEXT,
-content TEXT
-)
-""")
-
+for t in tables:
+    cursor.execute(t)
 conn.commit()
 
-# =========================================
-# PROMPT
-# =========================================
-
 MASTER_PROMPT = """
-Você é StreetCore OS.
-
-Um sistema operacional IA avançado.
-
-Você possui:
-- inteligência de CEO;
-- branding premium;
-- automação;
-- programação;
-- growth hacking;
-- marketing;
-- criação de conteúdo;
-- engenharia de IA.
-
-Responda:
-- em português;
-- passo a passo;
-- como se estivesse fazendo pelo usuário;
-- de forma prática;
-- extremamente estratégica.
-
-Use ferramentas gratuitas.
+Você é StreetCore OS GOD MODE.
+Responda sempre em português.
+Use apenas ferramentas gratuitas ou plano grátis como padrão.
+Aja como CEO, estrategista, diretor criativo, engenheiro de IA, programador,
+copywriter, social media, vendedor, analista de growth, automação e assistente operacional.
+Explique passo a passo, como se estivesse fazendo pelo usuário.
+Nunca execute ação sensível sem aprovação.
 """
-
-# =========================================
-# AGENTS
-# =========================================
 
 AGENTS = {
-
-"ceo":
-"""
-Você é CEO especialista em:
-- SaaS
-- negócios digitais
-- monetização
-- escala
-- IA
-""",
-
-"marketing":
-"""
-Você é especialista em:
-- branding
-- viralização
-- conteúdo
-- copywriting
-- funis
-""",
-
-"dev":
-"""
-Você é engenheiro especialista em:
-- Python
-- IA
-- APIs
-- automação
-- sistemas
-""",
-
-"design":
-"""
-Você é diretor criativo premium especialista em:
-- cyberpunk premium
-- cinematic
-- branding
-- thumbnails
-- logos
-""",
-
-"automation":
-"""
-Você é especialista em:
-- automações
-- workflows
-- produtividade
-- agentes IA
-"""
+    "ceo": "CEO Agent: estratégia, monetização, escala, priorização e negócios digitais.",
+    "marketing": "Marketing Agent: branding, copy, viralização, funis, conteúdo e crescimento.",
+    "dev": "Dev Agent: Python, APIs, SaaS, automação, banco de dados, deploy e arquitetura.",
+    "design": "Design Agent: direção criativa, cyberpunk premium, logos, imagens e identidade visual.",
+    "video": "Video Agent: roteiros, cenas, prompts de vídeo, Reels, Shorts, anúncios.",
+    "automation": "Automation Agent: workflows, processos, produtividade e sistemas automáticos.",
+    "sales": "Sales Agent: oferta, vendas, objeções, WhatsApp, fechamento e monetização."
 }
 
-# =========================================
-# AI
-# =========================================
+SENSITIVE = ["publicar", "postar agora", "enviar", "apagar", "deletar", "comprar", "pagar", "contratar", "cancelar", "transferir"]
+
+def now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def log_event(event, data=""):
+    cursor.execute("INSERT INTO analytics(event,data,created_at) VALUES(?,?,?)", (event, data, now()))
+    conn.commit()
+
+def chunk_send_text(text, limit=3900):
+    return [text[i:i+limit] for i in range(0, len(text), limit)]
+
+def text_vector(text, size=96):
+    vec = [0.0] * size
+    words = text.lower().split()
+    for w in words:
+        idx = hash(w) % size
+        vec[idx] += 1.0
+    norm = math.sqrt(sum(x*x for x in vec)) or 1
+    return [x / norm for x in vec]
+
+def cosine(a, b):
+    return sum(x*y for x, y in zip(a, b))
+
+def save_vector_memory(content):
+    vec = text_vector(content)
+    cursor.execute("INSERT INTO memory(content,created_at) VALUES(?,?)", (content, now()))
+    cursor.execute("INSERT INTO vectors(content,vector,created_at) VALUES(?,?,?)", (content, json.dumps(vec), now()))
+    conn.commit()
+
+def vector_search(query, limit=5):
+    qv = text_vector(query)
+    rows = cursor.execute("SELECT content, vector FROM vectors").fetchall()
+    scored = []
+    for content, vec_json in rows:
+        try:
+            v = json.loads(vec_json)
+            scored.append((cosine(qv, v), content))
+        except:
+            pass
+    scored.sort(reverse=True, key=lambda x: x[0])
+    return [x[1] for x in scored[:limit]]
 
 def ask_ai(prompt, role="ceo"):
-
-    memories = cursor.execute(
-        "SELECT content FROM memory ORDER BY id DESC LIMIT 20"
-    ).fetchall()
-
-    memory_text = "\n".join(
-        [m[0] for m in memories]
-    )
+    memories = vector_search(prompt, 6)
+    memory_text = "\n".join(memories)
 
     response = client.chat.completions.create(
-
         model="llama-3.3-70b-versatile",
-
         messages=[
-
-            {
-                "role":"system",
-                "content":
-                MASTER_PROMPT +
-                "\n\n" +
-                AGENTS.get(role, "")
-            },
-
-            {
-                "role":"system",
-                "content":
-                f"MEMÓRIA:\n{memory_text}"
-            },
-
-            {
-                "role":"user",
-                "content":prompt
-            }
+            {"role": "system", "content": MASTER_PROMPT + "\n\n" + AGENTS.get(role, "")},
+            {"role": "system", "content": f"MEMÓRIA VETORIAL:\n{memory_text}"},
+            {"role": "user", "content": prompt}
         ],
-
         temperature=0.8,
         max_tokens=4000
     )
 
     result = response.choices[0].message.content
-
-    cursor.execute(
-        "INSERT INTO history(agent,prompt,response) VALUES(?,?,?)",
-        (role,prompt,result)
-    )
-
+    cursor.execute("INSERT INTO history(agent,prompt,response,created_at) VALUES(?,?,?,?)", (role, prompt, result, now()))
     conn.commit()
-
+    log_event("ai_response", role)
     return result
 
-# =========================================
-# IMAGE
-# =========================================
-
 def image_url(prompt):
-
-    encoded = urllib.parse.quote(prompt)
-
-    return f"https://image.pollinations.ai/prompt/{encoded}"
-
-# =========================================
-# FILE READER
-# =========================================
+    return f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}"
 
 def read_file(path):
-
     content = ""
-
-    if path.endswith(".pdf"):
-
+    if path.lower().endswith(".pdf"):
         reader = PdfReader(path)
-
         for page in reader.pages:
-
             try:
                 content += page.extract_text() + "\n"
             except:
                 pass
-
-    elif path.endswith(".txt"):
-
+    elif path.lower().endswith(".txt"):
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
+    return content[:60000]
 
-    return content[:50000]
+def needs_approval(text):
+    return any(x in text.lower() for x in SENSITIVE)
 
-# =========================================
-# TELEGRAM
-# =========================================
+async def send_long(update, text):
+    for part in chunk_send_text(text):
+        await update.message.reply_text(part)
 
 async def start(update, context):
-
-    await update.message.reply_text(
-"""
-🔥 StreetCore OS V4 online.
-
-Digite:
-/menu
-"""
-)
+    await update.message.reply_text("🔥 StreetCore OS V5 GOD MODE online. Digite /menu")
 
 async def menu(update, context):
+    await update.message.reply_text("""
+🔥 STREETCORE OS V5 GOD MODE
 
-    await update.message.reply_text(
-"""
-🔥 STREETCORE OS V4
-
+IA:
 /completo ideia
 /ceo ideia
 /marketing ideia
 /dev ideia
 /design ideia
+/video ideia
 /auto ideia
+/sales ideia
 
+CONTEÚDO:
+/post instagram tema
+/posts
+/videoai tema
+/videos
+
+AUTOMAÇÃO:
+/workflow nome + objetivo
+/workflows
+/copiloto objetivo
+
+MEMÓRIA:
+/salvar memória
+/memorias
+/buscar termo
+
+TAREFAS:
+/tarefa texto
+/tarefas
+/concluir id
+
+IMAGEM:
 /imagem tema
 /logo marca
 /thumb tema
 
-/tarefa texto
-/tarefas
-
-/salvar memoria
-/memorias
-
-/historico
-
+SISTEMA:
 /status
-"""
-)
-
-# =========================================
-# STATUS
-# =========================================
+/historico
+/analytics
+/aprovar id
+""")
 
 async def status(update, context):
+    counts = {}
+    for table in ["memory", "tasks", "history", "files", "posts", "videos", "workflows", "approvals", "analytics"]:
+        counts[table] = cursor.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
-    task_count = cursor.execute(
-        "SELECT COUNT(*) FROM tasks"
-    ).fetchone()[0]
+    await update.message.reply_text(f"""
+🚀 STREETCORE STATUS
 
-    history_count = cursor.execute(
-        "SELECT COUNT(*) FROM history"
-    ).fetchone()[0]
+Memórias: {counts['memory']}
+Tarefas: {counts['tasks']}
+Histórico: {counts['history']}
+Arquivos: {counts['files']}
+Posts: {counts['posts']}
+Vídeos: {counts['videos']}
+Workflows: {counts['workflows']}
+Aprovações: {counts['approvals']}
+Analytics: {counts['analytics']}
 
-    mem_count = cursor.execute(
-        "SELECT COUNT(*) FROM memory"
-    ).fetchone()[0]
-
-    file_count = cursor.execute(
-        "SELECT COUNT(*) FROM files"
-    ).fetchone()[0]
-
-    await update.message.reply_text(
-f"""
-🔥 STREETCORE STATUS
-
-Memórias: {mem_count}
-Tarefas: {task_count}
-Histórico: {history_count}
-Arquivos: {file_count}
-
-Sistema:
-✅ Online
-✅ Dashboard
-✅ Upload IA
-✅ SQLite
-✅ Multi Agents
-"""
-)
-
-# =========================================
-# TASKS
-# =========================================
-
-async def tarefa(update, context):
-
-    text = " ".join(context.args)
-
-    cursor.execute(
-        "INSERT INTO tasks(task) VALUES(?)",
-        (text,)
-    )
-
-    conn.commit()
-
-    await update.message.reply_text(
-        "✅ tarefa salva"
-    )
-
-async def tarefas(update, context):
-
-    tasks = cursor.execute(
-        "SELECT * FROM tasks ORDER BY id DESC LIMIT 30"
-    ).fetchall()
-
-    text = "🧠 TAREFAS\n\n"
-
-    for task in tasks:
-
-        text += f"{task[0]}. {task[1]}\n"
-
-    await update.message.reply_text(
-        text[:4000]
-    )
-
-# =========================================
-# MEMORY
-# =========================================
-
-async def salvar(update, context):
-
-    text = " ".join(context.args)
-
-    cursor.execute(
-        "INSERT INTO memory(content) VALUES(?)",
-        (text,)
-    )
-
-    conn.commit()
-
-    await update.message.reply_text(
-        "🧠 memória salva"
-    )
-
-async def memorias(update, context):
-
-    memories = cursor.execute(
-        "SELECT * FROM memory ORDER BY id DESC LIMIT 20"
-    ).fetchall()
-
-    text = "🧠 MEMÓRIAS\n\n"
-
-    for mem in memories:
-
-        text += f"{mem[0]}. {mem[1]}\n\n"
-
-    await update.message.reply_text(
-        text[:4000]
-    )
-
-# =========================================
-# HISTORY
-# =========================================
-
-async def historico(update, context):
-
-    data = cursor.execute(
-        "SELECT * FROM history ORDER BY id DESC LIMIT 10"
-    ).fetchall()
-
-    text = "📚 HISTÓRICO\n\n"
-
-    for item in data:
-
-        text += f"""
-ID: {item[0]}
-AGENTE: {item[1]}
-PROMPT: {item[2][:80]}
-
--------------------
-"""
-
-    await update.message.reply_text(
-        text[:4000]
-    )
-
-# =========================================
-# AGENT
-# =========================================
+✅ Web ativo
+✅ Telegram ativo
+✅ SQLite ativo
+✅ Memória vetorial local ativa
+✅ Upload IA ativo
+✅ Multiagentes ativo
+✅ Copiloto operacional ativo
+""")
 
 async def generic_agent(update, context, role):
-
     prompt = " ".join(context.args)
-
+    if not prompt:
+        await update.message.reply_text("Digite uma ideia após o comando.")
+        return
     response = ask_ai(prompt, role)
-
-    for i in range(0, len(response), 3900):
-
-        await update.message.reply_text(
-            response[i:i+3900]
-        )
-
-# =========================================
-# MULTI
-# =========================================
+    await send_long(update, response)
 
 async def completo(update, context):
-
     prompt = " ".join(context.args)
-
     final = ""
-
-    for role in AGENTS.keys():
-
+    for role in AGENTS:
         result = ask_ai(prompt, role)
-
-        final += f"\n\n### {role.upper()}\n\n{result}"
-
-    for i in range(0, len(final), 3900):
-
-        await update.message.reply_text(
-            final[i:i+3900]
-        )
-
-# =========================================
-# IMAGES
-# =========================================
-
-async def imagem(update, context):
-
-    prompt = " ".join(context.args)
-
-    await update.message.reply_photo(
-        photo=image_url(
-            f"""
-            cinematic futuristic image,
-            ultra realistic,
-            cyberpunk premium,
-            8k,
-            {prompt}
-            """
-        )
-    )
-
-async def logo(update, context):
-
-    prompt = " ".join(context.args)
-
-    await update.message.reply_photo(
-        photo=image_url(
-            f"""
-            futuristic luxury logo,
-            clean vector,
-            premium branding,
-            {prompt}
-            """
-        )
-    )
-
-async def thumb(update, context):
-
-    prompt = " ".join(context.args)
-
-    await update.message.reply_photo(
-        photo=image_url(
-            f"""
-            youtube thumbnail,
-            cinematic,
-            viral,
-            futuristic,
-            dramatic,
-            {prompt}
-            """
-        )
-    )
-
-# =========================================
-# COMMANDS
-# =========================================
-
-async def ceo(update, context):
-    await generic_agent(update, context, "ceo")
-
-async def marketing(update, context):
-    await generic_agent(update, context, "marketing")
-
-async def dev(update, context):
-    await generic_agent(update, context, "dev")
-
-async def design(update, context):
-    await generic_agent(update, context, "design")
-
-async def auto(update, context):
-    await generic_agent(update, context, "automation")
-
-# =========================================
-# NORMAL CHAT
-# =========================================
-
-async def normal_chat(update, context):
-
-    text = update.message.text
-
-    response = ask_ai(text)
-
-    for i in range(0, len(response), 3900):
-
-        await update.message.reply_text(
-            response[i:i+3900]
-        )
-
-# =========================================
-# WEB
-# =========================================
-
-web = Flask(__name__)
-
-HTML = """
-<!doctype html>
-
-<html>
-
-<head>
-
-<title>StreetCore OS</title>
-
-<style>
-
-body{
-background:#050510;
-color:white;
-font-family:Arial;
-margin:0;
-display:flex;
-height:100vh;
-}
-
-.sidebar{
-width:260px;
-background:#0d0d18;
-padding:20px;
-border-right:1px solid #222;
-}
-
-.logo{
-font-size:28px;
-font-weight:bold;
-color:#9333ea;
-margin-bottom:20px;
-}
-
-.main{
-flex:1;
-display:flex;
-flex-direction:column;
-}
-
-.top{
-height:70px;
-background:#0d0d18;
-display:flex;
-align-items:center;
-padding:0 20px;
-border-bottom:1px solid #222;
-}
-
-.chat{
-flex:1;
-padding:30px;
-overflow:auto;
-display:flex;
-flex-direction:column;
-gap:20px;
-}
-
-.msg{
-padding:18px;
-border-radius:18px;
-max-width:850px;
-white-space:pre-wrap;
-line-height:1.6;
-}
-
-.user{
-background:#1f1f35;
-align-self:flex-end;
-}
-
-.ai{
-background:#111827;
-border:1px solid #333;
-}
-
-.input-area{
-padding:20px;
-display:flex;
-gap:15px;
-background:#0d0d18;
-}
-
-input{
-flex:1;
-padding:18px;
-border:none;
-border-radius:14px;
-background:#151525;
-color:white;
-}
-
-button{
-padding:18px 24px;
-background:#9333ea;
-border:none;
-border-radius:14px;
-color:white;
-cursor:pointer;
-}
-
-.upload{
-margin-top:10px;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="sidebar">
-
-<div class="logo">
-🔥 StreetCore OS
-</div>
-
-<p>ONLINE • GOD MODE</p>
-
-</div>
-
-<div class="main">
-
-<div class="top">
-StreetCore AI Operating System
-</div>
-
-<div class="chat" id="chat">
-
-<div class="msg ai">
-🔥 StreetCore OS V4 online.
-
-Upload de arquivos IA ativo.
-</div>
-
-</div>
-
-<div class="input-area">
-
-<input
-id="prompt"
-placeholder="Digite sua ideia..."
->
-
-<button onclick="sendMessage()">
-Enviar
-</button>
-
-</div>
-
-<div class="upload">
-
-<input type="file" id="file">
-
-<button onclick="uploadFile()">
-Upload IA
-</button>
-
-</div>
-
-</div>
-
-<script>
-
-async function sendMessage(){
-
-const input =
-document.getElementById("prompt");
-
-const text =
-input.value;
-
-if(!text) return;
-
-const chat =
-document.getElementById("chat");
-
-chat.innerHTML += `
-<div class="msg user">${text}</div>
-`;
-
-input.value = "";
-
-const response =
-await fetch("/ask",{
-
-method:"POST",
-
-headers:{
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-prompt:text
-})
-
-});
-
-const data =
-await response.json();
-
-chat.innerHTML += `
-<div class="msg ai">${data.response}</div>
-`;
-
-chat.scrollTop =
-chat.scrollHeight;
-
-}
-
-async function uploadFile(){
-
-const fileInput =
-document.getElementById("file");
-
-const file =
-fileInput.files[0];
-
-if(!file) return;
-
-const formData =
-new FormData();
-
-formData.append(
-"file",
-file
-);
-
-const response =
-await fetch("/upload",{
-
-method:"POST",
-body:formData
-
-});
-
-const data =
-await response.json();
-
-const chat =
-document.getElementById("chat");
-
-chat.innerHTML += `
-<div class="msg ai">${data.response}</div>
-`;
-
-chat.scrollTop =
-chat.scrollHeight;
-
-}
-
-</script>
-
-</body>
-
-</html>
-"""
-
-@web.route("/")
-def home():
-
-    return render_template_string(HTML)
-
-@web.route("/ask", methods=["POST"])
-def ask_web():
-
-    data = request.get_json()
-
-    prompt = data.get("prompt","")
-
-    response = ask_ai(prompt)
-
-    return jsonify({
-        "response":response
-    })
-
-@web.route("/upload", methods=["POST"])
-def upload():
-
-    if "file" not in request.files:
-
-        return jsonify({
-            "response":"Nenhum arquivo."
-        })
-
-    file = request.files["file"]
-
-    filename = secure_filename(file.filename)
-
-    path = os.path.join(
-        UPLOAD_FOLDER,
-        filename
-    )
-
-    file.save(path)
-
-    content = read_file(path)
-
-    cursor.execute(
-        "INSERT INTO files(filename,content) VALUES(?,?)",
-        (filename,content)
-    )
-
+        final += f"\n\n## {role.upper()}\n\n{result}"
+    await send_long(update, final)
+
+async def ceo(update, context): await generic_agent(update, context, "ceo")
+async def marketing(update, context): await generic_agent(update, context, "marketing")
+async def dev(update, context): await generic_agent(update, context, "dev")
+async def design(update, context): await generic_agent(update, context, "design")
+async def video_cmd(update, context): await generic_agent(update, context, "video")
+async def auto(update, context): await generic_agent(update, context, "automation")
+async def sales(update, context): await generic_agent(update, context, "sales")
+
+async def tarefa(update, context):
+    text = " ".join(context.args)
+    cursor.execute("INSERT INTO tasks(task,status,created_at) VALUES(?,?,?)", (text, "pendente", now()))
     conn.commit()
+    await update.message.reply_text("✅ tarefa salva")
 
-    analysis = ask_ai(
-f"""
-Analise este arquivo profundamente.
+async def tarefas(update, context):
+    rows = cursor.execute("SELECT id, task, status FROM tasks ORDER BY id DESC LIMIT 50").fetchall()
+    text = "🧠 TAREFAS\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2]}\n"
+    await send_long(update, text if rows else "Nenhuma tarefa.")
 
-Arquivo:
-{filename}
+async def concluir(update, context):
+    try:
+        task_id = int(context.args[0])
+        cursor.execute("UPDATE tasks SET status=? WHERE id=?", ("concluída", task_id))
+        conn.commit()
+        await update.message.reply_text("✅ concluída")
+    except:
+        await update.message.reply_text("Use: /concluir 1")
 
-Conteúdo:
-{content[:12000]}
+async def salvar(update, context):
+    text = " ".join(context.args)
+    save_vector_memory(text)
+    await update.message.reply_text("🧠 memória vetorial salva")
 
-Crie:
-- resumo;
-- insights;
-- melhorias;
-- oportunidades;
-- análise estratégica.
-"""
-    )
+async def memorias(update, context):
+    rows = cursor.execute("SELECT id, content FROM memory ORDER BY id DESC LIMIT 20").fetchall()
+    text = "🧠 MEMÓRIAS\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]}\n\n"
+    await send_long(update, text[:4000] if rows else "Sem memórias.")
 
-    return jsonify({
-        "response":analysis
-    })
+async def buscar(update, context):
+    q = " ".join(context.args)
+    results = vector_search(q, 8)
+    text = f"🔎 BUSCA VETORIAL: {q}\n\n"
+    for i, r in enumerate(results, 1):
+        text += f"{i}. {r}\n\n"
+    await send_long(update, text if results else "Nada encontrado.")
 
-@web.route("/api/status")
-def api_status():
-
-    return jsonify({
-
-        "tasks":
-        cursor.execute(
-            "SELECT COUNT(*) FROM tasks"
-        ).fetchone()[0],
-
-        "history":
-        cursor.execute(
-            "SELECT COUNT(*) FROM history"
-        ).fetchone()[0],
-
-        "memory":
-        cursor.execute(
-            "SELECT COUNT(*) FROM memory"
-        ).fetchone()[0],
-
-        "files":
-        cursor.execute(
-            "SELECT COUNT(*) FROM files"
-        ).fetchone()[0]
-    })
-
-# =========================================
-# RUN WEB
-# =========================================
-
-def run_web():
-
-    web.run(
-        host="0.0.0.0",
-        port=PORT
-    )
-
-# =========================================
-# TELEGRAM
-# =========================================
-
-app = (
-    ApplicationBuilder()
-    .token(TELEGRAM_TOKEN)
-    .build()
-)
-
-# =========================================
-# HANDLERS
-# =========================================
-
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("menu", menu))
-app.add_handler(CommandHandler("status", status))
-
-app.add_handler(CommandHandler("tarefa", tarefa))
-app.add_handler(CommandHandler("tarefas", tarefas))
-
-app.add_handler(CommandHandler("salvar", salvar))
-app.add_handler(CommandHandler("memorias", memorias))
-
-app.add_handler(CommandHandler("historico", historico))
-
-app.add_handler(CommandHandler("imagem", imagem))
-app.add_handler(CommandHandler("logo", logo))
-app.add_handler(CommandHandler("thumb", thumb))
-
-app.add_handler(CommandHandler("ceo", ceo))
-app.add_handler(CommandHandler("marketing", marketing))
-app.add_handler(CommandHandler("dev", dev))
-app.add_handler(CommandHandler("design", design))
-app.add_handler(CommandHandler("auto", auto))
-
-app.add_handler(CommandHandler("completo", completo))
-
-app.add_handler(
-    MessageHandler(
-        filters.TEXT &
-        ~filters.COMMAND,
-        normal_chat
-    )
-)
-
-# =========================================
-# START
-# =========================================
-
-threading.Thread(
-    target=run_web,
-    daemon=True
-).start()
-
-print("🔥 STREETCORE OS V4 ONLINE")
-
-app.run_polling()
+async def historico(update, context):
+    rows = cursor.execute("SELECT id, agent, prompt FROM history ORDER BY id DESC LIMIT 20").fetchall()
+    text = "📚 HISTÓRICO\n\n"
+    for r in rows:
+        text += f"{r[0]}. {r[1]} — {r[2][:100]
