@@ -272,6 +272,7 @@ TABLES = {
     "cliente_portal": "id INTEGER PRIMARY KEY AUTOINCREMENT,cliente TEXT,pedido TEXT,status TEXT DEFAULT 'recebido',codigo TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "erros": "id INTEGER PRIMARY KEY AUTOINCREMENT,rota TEXT,erro TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "configuracoes": "id INTEGER PRIMARY KEY AUTOINCREMENT,chave TEXT,valor TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "chat_sessions": "id INTEGER PRIMARY KEY AUTOINCREMENT,usuario TEXT,pergunta TEXT,resposta TEXT,criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "logs": """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mensagem TEXT,
@@ -341,7 +342,7 @@ def iniciar_banco():
                 (nome, funcao, "Aguardando primeira execução.")
             )
 
-    print("✅ StreetCore OS V40 QUANTUM ENTERPRISE CORE iniciado.")
+    print("✅ StreetCore OS V41 CHATGPT STUDIO CORE iniciado.")
 
 
 def inserir(tabela, campos, valores):
@@ -937,104 +938,443 @@ def gerar_analytics():
 
 def layout(conteudo):
     menu = [
+        ("Chat IA", "/chat"),
+        ("Workspace", "/workspace"),
         ("Dashboard", "/"),
         ("Criar", "/criar"),
-        ("Neural Center", "/neural"),
         ("Quantum", "/quantum"),
         ("Executivo", "/executivo"),
+        ("Neural Center", "/neural"),
+        ("Multiagentes", "/multiagentes"),
+        ("Ultra", "/ultra"),
+        ("Master", "/master"),
+        ("Pipeline", "/pipeline"),
         ("Kanban Leads", "/kanban-leads"),
         ("Kanban Produção", "/kanban-producao"),
-        ("Portal Cliente", "/portal-cliente"),
-        ("Erros", "/erros"),
-        ("Export Completo", "/export-completo"),
-        ("Master V40", "/master"),
-        ("Ultra Infinity", "/ultra"),
-        ("Pipeline", "/pipeline"),
-        ("Oportunidades", "/oportunidades"),
-        ("Auditoria", "/auditoria"),
-        ("Ideias IA", "/ideias-ia"),
-        ("Rotinas", "/rotinas"),
-        ("Alertas", "/alertas"),
-        ("Follow-up", "/followup"),
-        ("Singularity", "/singularity"),
-        ("Workflow Vendas", "/workflow-vendas"),
-        ("Funil", "/funil"),
-        ("Decisão Máxima", "/decisao-maxima"),
-        ("Multiagentes", "/multiagentes"),
         ("Conteúdo IA", "/conteudo"),
-        ("Aprovação Posts", "/aprovacoes"),
-        ("Instagram Queue", "/instagram"),
-        ("Operador IA", "/operador"),
-        ("Workflows", "/workflows"),
-        ("Voz IA", "/voz"),
-        ("Imagem IA", "/imagem-ia"),
-        ("Vídeo IA", "/video-ia"),
-        ("Analytics IA", "/analytics"),
-        ("Multiempresa", "/empresas"),
+        ("Aprovações", "/aprovacoes"),
+        ("Instagram", "/instagram"),
         ("Propostas", "/propostas"),
         ("PDF Proposta", "/pdf-proposta"),
         ("Atendimento", "/atendimento"),
         ("Upload", "/upload"),
         ("Busca", "/buscar"),
         ("Financeiro", "/financeiro"),
-        ("Relatório", "/relatorio"),
-        ("Automações", "/automacoes"),
-        ("Usuários", "/usuarios"),
-        ("Modo Cliente", "/cliente"),
-        ("API Info", "/api/info"),
+        ("Portal Cliente", "/portal-cliente"),
+        ("Design System", "/design-system"),
         ("Backup", "/backup"),
-        ("Restaurar", "/restore")
+        ("Sair", "/logout"),
     ]
 
     tables = [
         "pedidos", "leads", "clientes", "produtos", "estoque",
         "producao", "tarefas", "campanhas", "conteudos",
         "documentos", "conhecimento", "uploads", "atendimentos",
-        "fornecedores", "notificacoes", "metas", "automacoes",
-        "memoria", "agentes", "instagram_queue", "workflows", "voz", "imagem_jobs", "video_jobs", "empresas", "analytics", "logs"
+        "pipeline", "oportunidades", "auditoria", "ideias",
+        "rotinas", "fornecedores", "notificacoes", "metas",
+        "automacoes", "memoria", "agentes", "instagram_queue",
+        "eventos", "cliente_portal", "erros", "logs", "chat_sessions"
     ]
 
-    links = "".join([f"<a href='{url}'>{nome}</a>" for nome, url in menu])
-    links += "<hr>" + "".join([f"<a href='/table/{t}'>{t.title()}</a>" for t in tables])
+    links = "".join([f"<a class='nav-link' href='{url}'>{nome}</a>" for nome, url in menu])
+    table_links = "".join([f"<a class='mini-link' href='/table/{t}'>{t.title()}</a>" for t in tables if t in SAFE_TABLES])
 
     return f"""
 <html>
 <head>
-<title>StreetCore V40 Singularity Empire</title>
+<title>StreetCore V41 ChatGPT Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{{margin:0;background:#050505;color:#fff;font-family:Arial;}}
-.sidebar{{position:fixed;top:0;left:0;bottom:0;width:315px;background:#0b0b0b;border-right:1px solid #222;padding:24px;overflow:auto;}}
-.sidebar h2{{color:#00ff88;}}
-.sidebar a{{display:block;color:white;text-decoration:none;margin:11px 0;}}
-.sidebar a:hover{{color:#00ff88;}}
-.main{{margin-left:365px;padding:30px;}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px;}}
-.card{{background:#111;border:1px solid #333;border-radius:18px;padding:22px;margin-bottom:18px;}}
-.big{{color:#00ff88;font-size:34px;font-weight:bold;}}
-input,select,textarea{{padding:12px;border-radius:10px;border:0;margin:6px 0;width:100%;background:#1c1c1c;color:white;}}
-textarea{{min-height:170px;}}
-button{{padding:12px 18px;border:0;border-radius:10px;background:#00ff88;font-weight:bold;cursor:pointer;}}
-table{{width:100%;border-collapse:collapse;background:#111;}}
-th,td{{padding:12px;border-bottom:1px solid #333;vertical-align:top;}}
-a{{color:#00ff88;}}
-pre{{white-space:pre-wrap;}}
-.bar{{background:#00ff88;height:18px;border-radius:10px;}}
-@media print{{
-.sidebar{{display:none;}}
-.main{{margin-left:0;}}
-body{{background:white;color:black;}}
-.card{{border:1px solid #999;background:white;color:black;}}
+:root {{
+    --bg:#212121;
+    --panel:#171717;
+    --panel2:#2f2f2f;
+    --card:#262626;
+    --border:#3f3f46;
+    --text:#ececec;
+    --muted:#b4b4b4;
+    --green:#10a37f;
+}}
+
+* {{ box-sizing:border-box; }}
+
+body {{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial;
+}}
+
+.shell {{ display:flex; min-height:100vh; }}
+
+.sidebar {{
+    width:310px;
+    background:#171717;
+    border-right:1px solid #2f2f2f;
+    padding:14px;
+    position:fixed;
+    top:0;
+    left:0;
+    bottom:0;
+    overflow:auto;
+}}
+
+.brand {{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px;
+    border-radius:14px;
+    background:#212121;
+    border:1px solid #333;
+    margin-bottom:12px;
+}}
+
+.logo {{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(135deg,var(--green),#087f5b);
+    color:white;
+    font-weight:900;
+}}
+
+.brand h2 {{ font-size:16px; margin:0; }}
+.brand p {{ color:var(--muted); font-size:12px; margin:2px 0 0 0; }}
+
+.nav-link {{
+    display:block;
+    color:#ececec;
+    text-decoration:none;
+    padding:11px 12px;
+    border-radius:10px;
+    margin:2px 0;
+    font-size:14px;
+}}
+
+.nav-link:hover {{ background:#2f2f2f; }}
+
+.section-title {{
+    color:#8e8e8e;
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:.08em;
+    padding:14px 12px 6px;
+}}
+
+.mini-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }}
+
+.mini-link {{
+    color:#d4d4d4;
+    text-decoration:none;
+    font-size:12px;
+    padding:8px;
+    border-radius:8px;
+    background:#202020;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+}}
+
+.mini-link:hover {{ background:#2f2f2f; }}
+
+.main {{
+    margin-left:310px;
+    width:calc(100% - 310px);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+}}
+
+.content {{
+    width:100%;
+    max-width:1180px;
+    padding:28px;
+}}
+
+.topbar {{
+    position:sticky;
+    top:0;
+    z-index:3;
+    background:rgba(33,33,33,.86);
+    backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(255,255,255,.06);
+    margin:-28px -28px 24px;
+    padding:16px 28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}}
+
+.topbar-title {{ font-weight:700; }}
+
+.topbar-badge {{
+    background:#2f2f2f;
+    border:1px solid #444;
+    padding:8px 12px;
+    border-radius:999px;
+    color:#d6d6d6;
+    font-size:13px;
+}}
+
+h1 {{
+    font-size:30px;
+    margin:0 0 16px;
+    letter-spacing:-.03em;
+}}
+
+h2 {{ font-size:18px; margin:0 0 10px; }}
+p {{ color:#d4d4d4; }}
+
+.grid {{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:14px;
+}}
+
+.card {{
+    background:var(--card);
+    border:1px solid #3a3a3a;
+    border-radius:18px;
+    padding:20px;
+    margin-bottom:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.16);
+}}
+
+.card:hover {{ border-color:#555; }}
+
+.big {{
+    color:#fff;
+    font-size:32px;
+    font-weight:800;
+    letter-spacing:-.04em;
+}}
+
+input,select,textarea {{
+    padding:14px 15px;
+    border-radius:14px;
+    border:1px solid #444;
+    margin:7px 0;
+    width:100%;
+    background:#2f2f2f;
+    color:white;
+    outline:none;
+    font-size:15px;
+}}
+
+input:focus,select:focus,textarea:focus {{
+    border-color:#777;
+    box-shadow:0 0 0 3px rgba(255,255,255,.06);
+}}
+
+textarea {{
+    min-height:170px;
+    resize:vertical;
+}}
+
+button {{
+    padding:13px 18px;
+    border:0;
+    border-radius:12px;
+    background:white;
+    color:#111;
+    font-weight:700;
+    cursor:pointer;
+}}
+
+button:hover {{ opacity:.88; }}
+
+table {{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    background:#262626;
+    border:1px solid #3a3a3a;
+    border-radius:16px;
+    overflow:hidden;
+}}
+
+th,td {{
+    padding:13px;
+    border-bottom:1px solid #3a3a3a;
+    vertical-align:top;
+    font-size:14px;
+}}
+
+th {{
+    color:#bdbdbd;
+    text-align:left;
+    background:#202020;
+}}
+
+a {{ color:#7dd3fc; }}
+
+pre {{
+    white-space:pre-wrap;
+    line-height:1.55;
+    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}}
+
+.chat-wrap {{
+    max-width:900px;
+    margin:0 auto;
+    min-height:calc(100vh - 120px);
+    display:flex;
+    flex-direction:column;
+}}
+
+.chat-hero {{
+    text-align:center;
+    padding:52px 20px 22px;
+}}
+
+.chat-hero h1 {{
+    font-size:34px;
+    margin-bottom:8px;
+}}
+
+.chat-box {{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    margin-bottom:110px;
+}}
+
+.message {{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+}}
+
+.avatar {{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    background:#3a3a3a;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    flex:0 0 auto;
+    font-size:12px;
+}}
+
+.avatar.ai {{ background:var(--green); }}
+
+.bubble {{
+    background:#2f2f2f;
+    border:1px solid #444;
+    border-radius:18px;
+    padding:16px;
+    max-width:100%;
+    line-height:1.55;
+}}
+
+.message.user {{ justify-content:flex-end; }}
+.message.user .bubble {{ background:#3a3a3a; }}
+
+.chat-input {{
+    position:fixed;
+    bottom:0;
+    left:310px;
+    right:0;
+    background:linear-gradient(180deg,rgba(33,33,33,0),#212121 30%);
+    padding:26px 24px;
+}}
+
+.chat-input-inner {{
+    max-width:900px;
+    margin:0 auto;
+    display:flex;
+    gap:10px;
+    background:#2f2f2f;
+    border:1px solid #555;
+    border-radius:22px;
+    padding:10px;
+}}
+
+.chat-input-inner textarea {{
+    margin:0;
+    min-height:52px;
+    max-height:160px;
+    border:0;
+    background:transparent;
+    resize:none;
+}}
+
+.chat-input-inner button {{
+    border-radius:16px;
+    padding:0 18px;
+}}
+
+.bar {{
+    background:var(--green);
+    height:18px;
+    border-radius:10px;
+}}
+
+@media(max-width:850px) {{
+    .sidebar {{
+        position:relative;
+        width:100%;
+        height:auto;
+    }}
+    .shell {{ display:block; }}
+    .main {{
+        margin-left:0;
+        width:100%;
+    }}
+    .chat-input {{ left:0; }}
+}}
+
+@media print {{
+    .sidebar,.topbar,.chat-input {{ display:none; }}
+    .main {{
+        margin-left:0;
+        width:100%;
+    }}
+    body {{
+        background:white;
+        color:black;
+    }}
+    .card {{
+        border:1px solid #999;
+        background:white;
+        color:black;
+    }}
 }}
 </style>
 </head>
 <body>
-<div class="sidebar">
-<h2>🔥 StreetCore V40</h2>
-{links}
-<a href="/logout">Sair</a>
-</div>
-<div class="main">
-{conteudo}
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="logo">SG</div>
+            <div>
+                <h2>StreetCore V41</h2>
+                <p>ChatGPT Studio</p>
+            </div>
+        </div>
+
+        <div class="section-title">Sistema</div>
+        {links}
+
+        <div class="section-title">Tabelas</div>
+        <div class="mini-grid">{table_links}</div>
+    </aside>
+
+    <main class="main">
+        <div class="content">
+            <div class="topbar">
+                <div class="topbar-title">StreetCore OS</div>
+                <div class="topbar-badge">Visual estilo ChatGPT</div>
+            </div>
+            {conteudo}
+        </div>
+    </main>
 </div>
 </body>
 </html>
@@ -1066,7 +1406,7 @@ def login():
     return f"""
 <body style="background:#050505;color:white;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh">
 <div style="background:#111;padding:40px;border-radius:20px;width:330px">
-<h1>🔥 StreetCore V40</h1>
+<h1>🔥 StreetCore V41</h1>
 {erro}
 <form method="POST">
 <input name="usuario" placeholder="Usuário" style="width:100%;padding:14px;margin-bottom:12px">
@@ -1120,7 +1460,7 @@ def home():
     """
 
     return layout(f"""
-    <h1>🔥 STREETCORE OS V40 QUANTUM ENTERPRISE CORE FREE</h1>
+    <h1>🔥 STREETCORE OS V41 CHATGPT STUDIO CORE FREE</h1>
     <p>ERP + CRM + IA + Multiagentes + Automação + Ollama + Webhook.</p>
     <div class="grid">{cards}</div>
     {grafico}
@@ -1132,7 +1472,7 @@ def home():
 def health():
     return jsonify({
         "status": "online",
-        "version": "V40 QUANTUM ENTERPRISE CORE FREE",
+        "version": "V41 CHATGPT STUDIO CORE FREE",
         "webhook": bool(WEBHOOK_URL),
         "ollama": USE_OLLAMA,
         "ollama_url": bool(OLLAMA_URL)
@@ -1752,7 +2092,7 @@ def restore():
 @app.route("/api/info")
 def api_info():
     return jsonify({
-        "version": "V40 QUANTUM ENTERPRISE CORE FREE",
+        "version": "V41 CHATGPT STUDIO CORE FREE",
         "api_key_header": "X-API-Key",
         "tables": SAFE_TABLES
     })
@@ -1816,7 +2156,7 @@ async def send(update, texto):
 
 async def start_cmd(update, context):
     await send(update,
-        "🔥 STREETCORE V40 QUANTUM ENTERPRISE CORE\n\n"
+        "🔥 STREETCORE V41 CHATGPT STUDIO CORE\n\n"
         "/neural vender mais hoje\n"
         "/agentes campanha de camisetas\n"
         "/relatorio\n"
@@ -1985,6 +2325,7 @@ async def telegram_main():
 
     for nome, funcao in comandos.items():
         telegram_app.add_handler(CommandHandler(nome, funcao))
+    telegram_app.add_handler(CommandHandler("chat", chat_cmd))
     for nome, funcao in {
         "quantum": quantum_cmd,
         "executivo": executivo_cmd,
@@ -2054,7 +2395,7 @@ def tratar_erro_global(e):
         return f"Erro controlado: {e}", 500
 
 # =========================
-# V40 QUANTUM ENTERPRISE CORE EXTRA
+# V41 CHATGPT STUDIO CORE EXTRA
 # =========================
 
 def workflow_vendas(cliente, descricao):
@@ -2151,7 +2492,7 @@ def singularity_center():
         resposta = operador_total(comando)
 
     return layout(f"""
-    <h1>👑 V40 Quantum Enterprise Center</h1>
+    <h1>👑 V41 ChatGPT Studio Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2223,7 +2564,7 @@ def decisao_maxima():
     """)
 
 
-# Comandos extras V40 no Telegram
+# Comandos extras V41 no Telegram
 async def singularity_cmd(update, context):
     await send(update, operador_total(" ".join(context.args)))
 
@@ -2263,7 +2604,7 @@ def tratar_erro_global(e):
         return f"Erro controlado: {e}", 500
 
 # =========================
-# V40 QUANTUM ENTERPRISE EXTRA
+# V41 CHATGPT STUDIO EXTRA
 # =========================
 
 def diagnostico_sistema():
@@ -2282,7 +2623,7 @@ def diagnostico_sistema():
     propostas_abertas = contar("propostas")
     tarefas_pendentes = sql("SELECT COUNT(*) FROM tarefas WHERE status='pendente'", fetch=True)[0][0]
 
-    return f"""🧠 DIAGNÓSTICO MASTER V40
+    return f"""🧠 DIAGNÓSTICO MASTER V41
 
 Receita: R$ {receita:.2f}
 Despesa: R$ {despesa:.2f}
@@ -2306,8 +2647,8 @@ Próximas ações:
 def plano_master_automatico():
     diag = diagnostico_sistema()
     acao = campanha("Street Graff personalizados")
-    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V40", "pendente", "alta"))
-    inserir("notificacoes", "mensagem, status", ("Plano Master V40 criado automaticamente.", "nova"))
+    inserir("tarefas", "titulo, status, prioridade", ("Executar plano master V41", "pendente", "alta"))
+    inserir("notificacoes", "mensagem, status", ("Plano Master V41 criado automaticamente.", "nova"))
     return f"""🚀 PLANO MASTER AUTOMÁTICO CRIADO
 
 {diag}
@@ -2354,7 +2695,7 @@ def master_center():
             resposta = conselho_multiagentes("Analise a operação inteira e gere o plano mais avançado possível.")
 
     return layout(f"""
-    <h1>👑 V40 Quantum Enterprise Center</h1>
+    <h1>👑 V41 ChatGPT Studio Center</h1>
 
     <div class="card">
         <form method="POST">
@@ -2514,12 +2855,12 @@ def criar():
             msg = f"Erro ao criar: {e}"
 
         try:
-            log(f"Criar painel V40: {tipo} | {nome} | {msg}")
+            log(f"Criar painel V41: {tipo} | {nome} | {msg}")
         except Exception:
             pass
 
     return layout(f"""
-    <h1>➕ Criar Registro — V40 corrigido, blindado e empresarial</h1>
+    <h1>➕ Criar Registro — V41 visual ChatGPT, avançado e blindado</h1>
 
     <div class="card">
         <p>{msg}</p>
