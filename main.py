@@ -25,7 +25,7 @@ Você é StreetCore AI.
 Responda sempre em português.
 Use apenas ferramentas gratuitas ou plano grátis.
 Aja como CEO, estrategista, diretor criativo, programador, vendedor,
-engenheiro de automação, designer visual e assistente pessoal.
+engenheiro de automação, designer visual, roteirista de vídeos e assistente pessoal.
 Explique passo a passo como se estivesse pegando na mão do usuário.
 """
 
@@ -36,7 +36,8 @@ AGENTS = {
     "vendas": "Você é o Sales Agent. Foque em oferta, copy e conversão.",
     "dev": "Você é o Dev Agent. Foque em tecnologia, código e deploy grátis.",
     "automacao": "Você é o Automation Agent. Foque em automações gratuitas.",
-    "visual": "Você é o Visual Agent. Foque em direção de arte, imagem, composição, estética premium e prompts visuais.",
+    "visual": "Você é o Visual Agent. Foque em direção de arte, imagem e estética premium.",
+    "video": "Você é o Video Agent. Foque em roteiro, cenas, narrativa, câmera, edição, Reels, Shorts, anúncios e prompts cinematográficos.",
     "assistente": "Você é o Personal Assistant Agent. Foque em rotina, agenda e organização."
 }
 
@@ -63,9 +64,6 @@ def memory():
     mem.setdefault("preferencias", [])
     return mem
 
-def save_memory(mem):
-    save_json(FILES["memory"], mem)
-
 def save_item(tipo, tema, conteudo):
     data = load_json(FILES["items"], [])
     data.append({
@@ -76,17 +74,6 @@ def save_item(tipo, tema, conteudo):
     })
     save_json(FILES["items"], data)
 
-def save_approval(acao, origem="manual"):
-    approvals = load_json(FILES["approvals"], [])
-    approvals.append({
-        "acao": acao,
-        "origem": origem,
-        "status": "pendente",
-        "data": str(datetime.now(TZ))
-    })
-    save_json(FILES["approvals"], approvals)
-    return len(approvals)
-
 def ask_ai(prompt, agent=None):
     mem = json.dumps(memory(), ensure_ascii=False, indent=2)
     agent_prompt = AGENTS.get(agent, "")
@@ -94,10 +81,7 @@ def ask_ai(prompt, agent=None):
     r = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
-            {
-                "role": "system",
-                "content": MASTER_PROMPT + "\n\n" + agent_prompt + f"\n\nMEMÓRIA:\n{mem}"
-            },
+            {"role": "system", "content": MASTER_PROMPT + "\n\n" + agent_prompt + f"\n\nMEMÓRIA:\n{mem}"},
             {"role": "user", "content": prompt}
         ],
         temperature=0.8,
@@ -129,94 +113,39 @@ def auto_memory(msg):
         pass
 
     mem["ultima_interacao"] = str(datetime.now(TZ))
-    save_memory(mem)
+    save_json(FILES["memory"], mem)
 
 def is_sensitive(text):
-    lower = text.lower()
-    return any(word in lower for word in SENSITIVE_WORDS)
+    return any(word in text.lower() for word in SENSITIVE_WORDS)
+
+def save_approval(acao, origem="manual"):
+    approvals = load_json(FILES["approvals"], [])
+    approvals.append({
+        "acao": acao,
+        "origem": origem,
+        "status": "pendente",
+        "data": str(datetime.now(TZ))
+    })
+    save_json(FILES["approvals"], approvals)
+    return len(approvals)
 
 def image_url(prompt, width=1024, height=1024, seed=77):
     encoded = urllib.parse.quote(prompt)
     return f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&seed={seed}"
 
-def premium_visual_prompt(tipo, tema):
-    base = f"""
-ultra realistic cinematic image,
-street luxury futuristic aesthetic,
-cyberpunk executive style,
-premium lighting,
-global luxury brand campaign,
-high contrast,
-sharp details,
-8k,
-highly detailed,
-professional composition.
-
-Theme:
-{tema}
-"""
-
+def visual_prompt(tipo, tema):
     if tipo == "logo":
-        return f"""
-minimal futuristic luxury logo,
-clean vector style,
-premium streetwear identity,
-white background,
-high-end fashion branding,
-simple iconic symbol,
-professional logo design.
-
-Brand:
-{tema}
-"""
-
+        return f"minimal futuristic luxury logo, clean vector style, premium streetwear identity, white background, professional logo design. Brand: {tema}"
     if tipo == "thumbnail":
-        return f"""
-viral YouTube thumbnail,
-cinematic premium composition,
-bold contrast,
-dramatic lighting,
-high click-through-rate design,
-street luxury futuristic aesthetic,
-clean readable focal point,
-no small unreadable text.
-
-Theme:
-{tema}
-"""
-
+        return f"viral YouTube thumbnail, cinematic premium composition, bold contrast, dramatic lighting, high CTR, street luxury futuristic aesthetic. Theme: {tema}"
     if tipo == "poster":
-        return f"""
-cinematic movie poster,
-premium futuristic street luxury,
-dramatic composition,
-high-end campaign,
-neon accents,
-urban luxury atmosphere,
-professional advertising poster.
-
-Theme:
-{tema}
-"""
-
+        return f"cinematic movie poster, premium futuristic street luxury, neon accents, urban luxury atmosphere, professional advertising poster. Theme: {tema}"
     if tipo == "banner":
-        return f"""
-wide cinematic banner,
-premium brand campaign,
-street luxury futuristic aesthetic,
-clean composition,
-cyberpunk executive mood,
-space for headline,
-professional advertising banner.
-
-Theme:
-{tema}
-"""
-
-    return base
+        return f"wide cinematic banner, premium brand campaign, street luxury futuristic aesthetic, space for headline. Theme: {tema}"
+    return f"ultra realistic cinematic image, street luxury futuristic aesthetic, cyberpunk executive style, premium lighting, 8k, highly detailed. Theme: {tema}"
 
 async def start(update, context):
-    await update.message.reply_text("🔥 StreetCore AI online com MODO IMAGEM COMPLETO. Digite /menu.")
+    await update.message.reply_text("🔥 StreetCore AI online com MODO VÍDEO. Digite /menu.")
 
 async def menu(update, context):
     await update.message.reply_text("""
@@ -241,12 +170,20 @@ MULTIAGENTES:
 /agent
 
 IMAGEM:
-/imagem descrição
-/logo nome da marca
-/thumbnail tema
-/poster tema
-/banner tema
-/promptimg tema
+/imagem
+/logo
+/thumbnail
+/poster
+/banner
+/promptimg
+
+VÍDEO:
+/video
+/roteiro
+/cenas
+/shorts
+/anuncio
+/promptvideo
 
 APROVAÇÕES:
 /pendentesaprovacao
@@ -276,14 +213,13 @@ Agendamentos: {len(load_json(FILES["schedules"], []))}
 Aprovações pendentes: {len(pendentes)}
 
 Sistema: ONLINE
-Modo: IMAGEM COMPLETO + APROVAÇÃO SEGURA
+Modo: VÍDEO + IMAGEM + APROVAÇÃO SEGURA
 """)
 
 async def memoria(update, context):
     mem = memory()
-    text = "🧠 MEMÓRIA:\n\n"
+    text = "🧠 MEMÓRIA:\n\n👤 PERFIL:\n"
 
-    text += "👤 PERFIL:\n"
     for k, v in mem.get("perfil", {}).items():
         text += f"• {k}: {v}\n"
 
@@ -299,24 +235,17 @@ async def memoria(update, context):
 
 async def tarefa(update, context):
     nome = " ".join(context.args)
-
     if not nome:
         await update.message.reply_text("Use:\n/tarefa criar logo")
         return
 
     tasks = load_json(FILES["tasks"], [])
-    tasks.append({
-        "tarefa": nome,
-        "status": "pendente",
-        "data": str(datetime.now(TZ))
-    })
+    tasks.append({"tarefa": nome, "status": "pendente", "data": str(datetime.now(TZ))})
     save_json(FILES["tasks"], tasks)
-
     await update.message.reply_text("✅ Tarefa criada.")
 
 async def tarefas(update, context):
     tasks = load_json(FILES["tasks"], [])
-
     if not tasks:
         await update.message.reply_text("Nenhuma tarefa.")
         return
@@ -354,14 +283,12 @@ async def concluir(update, context):
 
 async def generic(update, context, tipo, prompt, agent=None):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text(f"Use:\n/{tipo} tema")
         return
 
     resposta = ask_ai(prompt + "\n\nTema:\n" + tema, agent)
     save_item(tipo, tema, resposta)
-
     await send_long(update, resposta)
 
 async def ceo(update, context):
@@ -384,7 +311,6 @@ async def autoagent(update, context):
 
 async def agent(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/agent objetivo")
         return
@@ -409,84 +335,143 @@ Resolva usando múltiplos agentes:
 
 async def imagem(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/imagem descrição")
         return
-
     await update.message.reply_text("🎨 Gerando imagem premium grátis...")
-    prompt = premium_visual_prompt("imagem", tema)
-    await update.message.reply_photo(photo=image_url(prompt, 1024, 1024, 77))
+    await update.message.reply_photo(photo=image_url(visual_prompt("imagem", tema), 1024, 1024, 77))
 
 async def logo(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/logo nome da marca")
         return
-
     await update.message.reply_text("🔥 Criando logo grátis...")
-    prompt = premium_visual_prompt("logo", tema)
-    await update.message.reply_photo(photo=image_url(prompt, 1024, 1024, 88))
+    await update.message.reply_photo(photo=image_url(visual_prompt("logo", tema), 1024, 1024, 88))
 
 async def thumbnail(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/thumbnail tema")
         return
-
     await update.message.reply_text("🧲 Criando thumbnail grátis...")
-    prompt = premium_visual_prompt("thumbnail", tema)
-    await update.message.reply_photo(photo=image_url(prompt, 1280, 720, 99))
+    await update.message.reply_photo(photo=image_url(visual_prompt("thumbnail", tema), 1280, 720, 99))
 
 async def poster(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/poster tema")
         return
-
     await update.message.reply_text("🎬 Criando poster grátis...")
-    prompt = premium_visual_prompt("poster", tema)
-    await update.message.reply_photo(photo=image_url(prompt, 1024, 1536, 111))
+    await update.message.reply_photo(photo=image_url(visual_prompt("poster", tema), 1024, 1536, 111))
 
 async def banner(update, context):
     tema = " ".join(context.args)
-
     if not tema:
         await update.message.reply_text("Use:\n/banner tema")
         return
-
     await update.message.reply_text("🖼 Criando banner grátis...")
-    prompt = premium_visual_prompt("banner", tema)
-    await update.message.reply_photo(photo=image_url(prompt, 1536, 768, 222))
+    await update.message.reply_photo(photo=image_url(visual_prompt("banner", tema), 1536, 768, 222))
 
 async def promptimg(update, context):
-    tema = " ".join(context.args)
-
-    if not tema:
-        await update.message.reply_text("Use:\n/promptimg tema")
-        return
-
-    resposta = ask_ai(f"""
+    await generic(update, context, "promptimg", """
 Crie 5 prompts visuais ultra avançados para gerar imagens IA.
-
-Tema:
-{tema}
-
-Cada prompt deve ter:
-1. composição
-2. iluminação
-3. estilo
-4. lente/câmera
-5. atmosfera
-6. detalhes premium
-7. versão em inglês pronta para IA
+Cada prompt deve ter composição, iluminação, estilo, lente/câmera, atmosfera, detalhes premium e versão em inglês.
 """, "visual")
 
-    save_item("promptimg", tema, resposta)
-    await send_long(update, resposta)
+async def video(update, context):
+    await generic(update, context, "video", """
+Crie um conceito completo de vídeo cinematográfico.
+
+Inclua:
+1. Ideia central
+2. Objetivo do vídeo
+3. Público
+4. Duração recomendada
+5. Estilo visual
+6. Roteiro resumido
+7. Cenas principais
+8. Narração
+9. Texto na tela
+10. CTA
+11. Ferramentas gratuitas para executar
+""", "video")
+
+async def roteiro(update, context):
+    await generic(update, context, "roteiro", """
+Crie um roteiro completo para vídeo.
+
+Inclua:
+1. Hook inicial
+2. Cena por cena
+3. Narração
+4. Texto na tela
+5. B-roll
+6. Trilha sugerida
+7. Ritmo de edição
+8. CTA final
+""", "video")
+
+async def cenas(update, context):
+    await generic(update, context, "cenas", """
+Crie uma lista de cenas cinematográficas.
+
+Inclua:
+1. Cena
+2. Descrição visual
+3. Movimento de câmera
+4. Iluminação
+5. Ação
+6. Texto na tela
+7. Prompt visual para cada cena
+""", "video")
+
+async def shorts(update, context):
+    await generic(update, context, "shorts", """
+Crie um vídeo curto estilo Shorts/Reels/TikTok.
+
+Inclua:
+1. Hook de 3 segundos
+2. Roteiro de 30 segundos
+3. Cortes rápidos
+4. Texto na tela
+5. Narração
+6. CTA
+7. Ideia visual
+8. Legenda
+""", "video")
+
+async def anuncio(update, context):
+    await generic(update, context, "anuncio_video", """
+Crie um anúncio em vídeo.
+
+Inclua:
+1. Dor
+2. Promessa
+3. Produto/oferta
+4. Prova
+5. Objeções
+6. Roteiro de 15s
+7. Roteiro de 30s
+8. CTA
+9. Versão para Reels
+10. Versão para Stories
+""", "video")
+
+async def promptvideo(update, context):
+    await generic(update, context, "promptvideo", """
+Crie 5 prompts cinematográficos para gerar vídeo IA.
+
+Cada prompt deve incluir:
+1. Descrição da cena
+2. Movimento de câmera
+3. Iluminação
+4. Estilo visual
+5. Atmosfera
+6. Duração
+7. Formato 9:16
+8. Prompt em inglês pronto para ferramentas de vídeo IA gratuitas ou plano grátis
+""", "video")
 
 async def ativar(update, context):
     config = load_json(FILES["config"], {})
@@ -496,14 +481,11 @@ async def ativar(update, context):
 
 async def agendar(update, context):
     texto = " ".join(context.args)
-
     if not texto or len(texto.split()) < 2:
         await update.message.reply_text("Use:\n/agendar 09:00 revisar tarefas")
         return
 
-    partes = texto.split(" ", 1)
-    hora = partes[0]
-    acao = partes[1]
+    hora, acao = texto.split(" ", 1)
 
     try:
         datetime.strptime(hora, "%H:%M")
@@ -512,26 +494,18 @@ async def agendar(update, context):
         return
 
     schedules = load_json(FILES["schedules"], [])
-    schedules.append({
-        "hora": hora,
-        "acao": acao,
-        "ativo": True,
-        "ultimo_disparo": "",
-        "data": str(datetime.now(TZ))
-    })
+    schedules.append({"hora": hora, "acao": acao, "ativo": True, "ultimo_disparo": "", "data": str(datetime.now(TZ))})
     save_json(FILES["schedules"], schedules)
 
     await update.message.reply_text(f"⏰ Agendamento criado:\n{hora} — {acao}")
 
 async def agendamentos(update, context):
     schedules = load_json(FILES["schedules"], [])
-
     if not schedules:
         await update.message.reply_text("Nenhum agendamento.")
         return
 
     text = "⏰ AGENDAMENTOS:\n\n"
-
     for i, s in enumerate(schedules, 1):
         status = "ativo" if s.get("ativo") else "pausado"
         text += f"{i}. {s['hora']} — {s['acao']} — {status}\n"
@@ -547,7 +521,6 @@ async def pendentesaprovacao(update, context):
         return
 
     text = "🛡 APROVAÇÕES PENDENTES:\n\n"
-
     for i, a in pendentes:
         text += f"{i}. {a['acao']}\nOrigem: {a['origem']}\nData: {a['data']}\n\n"
 
@@ -563,21 +536,8 @@ async def aprovar(update, context):
         save_json(FILES["approvals"], approvals)
 
         acao = approvals[n - 1]["acao"]
-        resposta = ask_ai(f"""
-A ação foi aprovada pelo usuário.
-
-Ação:
-{acao}
-
-Entregue:
-1. Confirmação
-2. Plano de execução
-3. Passo a passo
-4. Como executar manualmente se necessário
-""", "assistente")
-
+        resposta = ask_ai(f"Ação aprovada: {acao}. Entregue plano de execução seguro.", "assistente")
         await send_long(update, resposta)
-
     except:
         await update.message.reply_text("Use:\n/aprovar 1")
 
@@ -615,30 +575,10 @@ async def scheduled_checker(context):
 
             if is_sensitive(acao):
                 idx = save_approval(acao, "agendamento")
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"🛡 Ação sensível detectada no agendamento.\n\nAprovação criada #{idx}:\n{acao}\n\nUse /aprovar {idx} ou /rejeitar {idx}"
-                )
+                await context.bot.send_message(chat_id=chat_id, text=f"🛡 Ação sensível detectada.\nAprovação #{idx}: {acao}")
             else:
-                resposta = ask_ai(f"""
-Execute este agendamento como assistente operacional:
-
-Ação programada:
-{acao}
-
-Entregue:
-1. O que fazer agora
-2. Passo 1
-3. Passo 2
-4. Passo 3
-5. Próxima ação imediata
-""", "assistente")
-
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"⏰ AGENDAMENTO AUTOMÁTICO\n\n{s['hora']} — {acao}"
-                )
-
+                resposta = ask_ai(f"Execute este agendamento como assistente operacional: {acao}", "assistente")
+                await context.bot.send_message(chat_id=chat_id, text=f"⏰ AGENDAMENTO AUTOMÁTICO\n\n{s['hora']} — {acao}")
                 for i in range(0, len(resposta), 3900):
                     await context.bot.send_message(chat_id=chat_id, text=resposta[i:i+3900])
 
@@ -654,9 +594,7 @@ async def handle_message(update, context):
 
     if is_sensitive(msg):
         idx = save_approval(msg, "mensagem")
-        await update.message.reply_text(
-            f"🛡 Isso parece uma ação sensível.\n\nCriei uma aprovação pendente #{idx}.\n\nUse:\n/aprovar {idx}\n/rejeitar {idx}"
-        )
+        await update.message.reply_text(f"🛡 Ação sensível. Aprovação criada #{idx}.\nUse /aprovar {idx} ou /rejeitar {idx}")
         return
 
     resposta = ask_ai(msg)
@@ -665,33 +603,17 @@ async def handle_message(update, context):
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 commands = {
-    "start": start,
-    "menu": menu,
-    "status": status,
-    "memoria": memoria,
-    "tarefa": tarefa,
-    "tarefas": tarefas,
-    "check": check,
-    "concluir": concluir,
-    "ceo": ceo,
-    "brandagent": brandagent,
-    "contentagent": contentagent,
-    "salesagent": salesagent,
-    "devagent": devagent,
-    "autoagent": autoagent,
+    "start": start, "menu": menu, "status": status, "memoria": memoria,
+    "tarefa": tarefa, "tarefas": tarefas, "check": check, "concluir": concluir,
+    "ceo": ceo, "brandagent": brandagent, "contentagent": contentagent,
+    "salesagent": salesagent, "devagent": devagent, "autoagent": autoagent,
     "agent": agent,
-    "imagem": imagem,
-    "logo": logo,
-    "thumbnail": thumbnail,
-    "poster": poster,
-    "banner": banner,
-    "promptimg": promptimg,
-    "ativar": ativar,
-    "agendar": agendar,
-    "agendamentos": agendamentos,
-    "pendentesaprovacao": pendentesaprovacao,
-    "aprovar": aprovar,
-    "rejeitar": rejeitar
+    "imagem": imagem, "logo": logo, "thumbnail": thumbnail,
+    "poster": poster, "banner": banner, "promptimg": promptimg,
+    "video": video, "roteiro": roteiro, "cenas": cenas,
+    "shorts": shorts, "anuncio": anuncio, "promptvideo": promptvideo,
+    "ativar": ativar, "agendar": agendar, "agendamentos": agendamentos,
+    "pendentesaprovacao": pendentesaprovacao, "aprovar": aprovar, "rejeitar": rejeitar
 }
 
 for name, func in commands.items():
@@ -700,5 +622,5 @@ for name, func in commands.items():
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.job_queue.run_repeating(scheduled_checker, interval=60, first=10)
 
-print("🔥 STREETCORE AI IMAGE COMPLETE MODE ONLINE")
+print("🔥 STREETCORE AI VIDEO MODE ONLINE")
 app.run_polling()
