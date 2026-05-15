@@ -7,4 +7,4 @@ def salvar_memoria(texto):
 def listar_memorias():
     if not memorias:
         return "Nenhuma memória salva ainda."
-    return "\n".join(f"- {m}" for m in memorias[-10:])
+    return "\n".join(f"- {item}" for item in memorias[-20:])
